@@ -1,0 +1,69 @@
+import VueRouter from 'vue-router'
+import layout from "@/layout/index.vue";
+
+const routes = [
+    {
+        path: '/',
+        component: layout,
+        redirect: '/home',
+        children: [
+            {
+                path: '/home',
+                name: 'home',
+                component: () => import('@/views/home/index.vue'),
+            },
+            {
+                path: '/subject/:subjectId',
+                name: 'subject',
+                component: () => import('@/views/subject/index.vue'),
+            },
+            {
+                path: '/paper/:paperId',
+                name: 'paper',
+                component: () => import('@/views/paper/index.vue'),
+            },
+            {
+                path: '/person',
+                name: 'person',
+                redirect: '/person/info',
+                component: () => import('@/views/person/index.vue'),
+                children: [
+                    {
+                        path: 'info',
+                        name: 'info',
+                        component: () => import('@/views/person/info/index.vue'),
+                    },
+                    {
+                        path: 'record',
+                        name: 'record',
+                        component: () => import('@/views/person/record/index.vue'),
+                    }
+                ]
+            },
+            {
+                path: '/review',
+                name: 'review',
+                component: () => import('@/views/review/index.vue'),
+            },
+            {
+                path: '/ai',
+                name: 'ai',
+                component: () => import('@/components/ai.vue'),
+            }
+
+
+        ],
+    },
+    {
+        path: '/login',
+        name: 'login',
+        meta: {requireToken: false},
+        component: () => import('@/views/login/index.vue')
+    }
+]
+
+export default new VueRouter({
+    // mode: 'history',
+    routes,
+    // scrollBehavior
+})
