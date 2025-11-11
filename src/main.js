@@ -52,9 +52,12 @@ VMdPreview.use(createLineNumbertPlugin());
 // import createMermaidPlugin from '@kangc/v-md-editor/lib/plugins/mermaid/cdn';
 // import '@kangc/v-md-editor/lib/plugins/mermaid/mermaid.css';
 // VMdPreview.use(createMermaidPlugin());
-
-
 Vue.use(VMdPreview)
+
+
+
+
+
 
 // 取消aria hidden提示
 

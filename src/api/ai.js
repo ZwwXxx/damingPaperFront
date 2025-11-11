@@ -1,11 +1,4 @@
 import request from  '@/utils/request'
-export function chat(data){
-    return request({
-        url: '/quiz/student/chat',
-        method: 'post',
-        data
-    })
-}
 
 export function clearRecord(){
     return request({

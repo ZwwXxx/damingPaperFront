@@ -87,7 +87,6 @@ export default {
       if (file.type.indexOf("image/") == -1) {
         this.$message.error("文件格式错误，请上传图片类型,如：JPG，PNG后缀的文件。");
       } else {
-        let compress;
         const imageConversion = require("image-conversion");
         console.log('压缩前'+(file.size / 1024)+"K");
         imageConversion.compressAccurately(file, 100).then(res => {

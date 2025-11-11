@@ -151,7 +151,7 @@ export default {
               </p>
               <p class="text-sm flex space-x-6 mt-2">
                 <span>试题数量:{{paper.questionCount}}</span>
-                <span>观看人数:6666</span>
+                <span>答题人数:</span>
               </p>
             </div>
           </div>

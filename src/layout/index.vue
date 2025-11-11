@@ -6,18 +6,18 @@
       <div class="container mx-auto h-full flex justify-between items-center p-4">
         <div class="text-white text-lg font-semibold cursor-pointer" @click="goToUrl('/home')">Daming Paper</div>
         <div class="hidden md:flex space-x-4 flex items-center">
-          <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white ">首页</a>
-          <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white ">AI</a>
-          <a href="#" @click="goToUrl('/person/info')" class="block text-gray-300 hover:text-white ">个人</a>
-          <a href="#">
+          <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white px-3 py-2">首页</a>
+          <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white px-3 py-2">AI</a>
+          <!-- <a href="#" @click="goToUrl('/person/info')" class="block text-gray-300 hover:text-white px-3 py-2">个人</a> -->
+          <a href="#" class="block px-3 py-2">
             <div @click="goToUrl('/person/info')">
               <img :src="avatar" alt="" style="width: 50px;height: 50px;border-radius: 100%">
             </div>
           </a>
-          <a href="#" class="text-white">
+          <!-- <a href="#" class="text-white px-3 py-2">
             {{ name }}
-          </a>
-          <a href="#">
+          </a> -->
+          <a href="#" class="px-3 py-2">
             <el-button @click="logout" style="height: 40px;">
               退出登录
             </el-button>
@@ -129,5 +129,18 @@ export default {
 {
   opacity: 0; /* 初始透明度 */
   transform: translateY(-20px); /* 向上移动 */
+}
+
+/* 导航链接区域样式 */
+nav a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+nav .container {
+  padding: 0 1rem;
+  height: 100%;
 }
 </style>
