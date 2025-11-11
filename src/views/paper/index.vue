@@ -7,8 +7,9 @@
   <wrapper size="md" padding="0">
     <!--左侧题目进度-->
     <el-card class="fixed top-20 left-0 w-1/4 ">
-      <div class="questType" v-for="(questType,index) in formData.paperQuestionTypeDto" :key=index>
-        <p class="mb-2">{{ questType.name }}</p>
+      <template v-if="!antiCheatActive">
+        <div class="questType" v-for="(questType,index) in formData.paperQuestionTypeDto" :key=index>
+          <p class="mb-2">{{ questType.name }}</p>
         <div class="question-anchor  flex flex-wrap  ">
           <el-tag
               @click="handleQuestionAnchorClick(question.itemOrder)"
@@ -16,10 +17,27 @@
               :type="getQuestionTagType(question.itemOrder)"
               style="padding: 0; display: flex; justify-content: center; width:  calc(20% - 10px); height: 30px;margin: 5px"
               :class="['cursor-pointer', {'current-question': antiCheatActive && question.itemOrder === currentQuestionOrder}]">
-            {{ qIndex + 1 }}  <!-- 使用 qIndex 递增标签 -->
+            {{ getDisplayNumberByOrder(question.itemOrder) }}
           </el-tag>
         </div>
       </div>
+      </template>
+      <template v-else>
+        <div class="questType">
+          <p class="mb-2">题目列表</p>
+          <div class="question-anchor flex flex-wrap">
+            <el-tag
+                v-for="(question, qIndex) in orderedQuestions"
+                :key="question.itemOrder"
+                :type="getQuestionTagType(question.itemOrder, qIndex)"
+                @click="handleQuestionAnchorClick(question.itemOrder, qIndex)"
+                style="padding: 0; display: flex; justify-content: center; width: calc(20% - 10px); height: 30px;margin: 5px"
+                :class="['cursor-pointer', {'current-question': antiCheatActive && qIndex === currentQuestionIndex}]">
+              {{ qIndex + 1 }}
+            </el-tag>
+          </div>
+        </div>
+      </template>
     </el-card>
     <!--中间题目内容-->
     <div class="container" v-if="!antiCheatActive">
@@ -32,8 +50,8 @@
 
               <span class="break-words w-full">
                 <span>
-                  <span class="text-red-800 font-bold mr-2" :id="questionItem.itemOrder">{{
-                      questionItem.itemOrder + 1
+                  <span class="text-red-800 font-bold mr-2" :id="questionItem.itemOrder">{{ 
+                      getQuestionDisplayNumber(questionItem)
                     }}.</span>{{
                     questionItem.questionTitle
                   }}
@@ -81,8 +99,8 @@
           <div class="q-title">
               <span class="break-words w-full">
                 <span>
-                  <span class="text-red-800 font-bold mr-2" :id="currentQuestion.itemOrder">{{
-                      currentQuestion.itemOrder + 1
+                  <span class="text-red-800 font-bold mr-2" :id="currentQuestion.itemOrder">{{ 
+                      getQuestionDisplayNumber(currentQuestion)
                     }}.</span>{{
                     currentQuestion.questionTitle
                   }}
@@ -158,10 +176,11 @@
 </template>
 
 <script>
-import wrapper from "@/components/wrapper.vue";
-import {getPaper} from "@/api/paper";
-import {submitAnswer} from "@/api/paperAnswer";
-import {formatSeconds} from "@/utils/time"
+  import wrapper from "@/components/wrapper.vue";
+  import {getPaper} from "@/api/paper";
+  import {submitAnswer} from "@/api/paperAnswer";
+  import {formatSeconds} from "@/utils/time"
+  import {getOrCreateShuffledOrder, clearShuffledOrder} from "@/utils/shuffle";
 
 export default {
   name: "index",
@@ -170,9 +189,13 @@ export default {
     this.syncAntiCheatState()
   },
   created() {
-    let paperId = this.$route.query.paperId
+    const paramsId = this.$route.params.paperId
+    const queryId = this.$route.query.paperId
+    const paperId = paramsId || queryId
     if (paperId) {
       this.getPaperById(paperId)
+    } else {
+      this.$router.replace({path: '/home'})
     }
   },
   components: {wrapper},
@@ -227,6 +250,10 @@ export default {
   beforeDestroy() {
     window.clearInterval(this.timer)
     this.disableAntiCheatFeatures()
+  },
+  beforeRouteLeave(to, from, next) {
+    this.resetShuffleCache()
+    next()
   },
   watch: {
     antiCheatEnabled() {
@@ -607,7 +634,7 @@ export default {
       this.buildQuestionCache()
     },
     buildQuestionCache() {
-      const questionList = []
+      let questionList = []
       const indexMap = {}
       const typeList = this.formData.paperQuestionTypeDto || []
       typeList.forEach((type) => {
@@ -619,13 +646,50 @@ export default {
         })
       })
       questionList.sort((a, b) => a.itemOrder - b.itemOrder)
-      questionList.forEach((question, index) => {
+      const orderedList = this.antiCheatEnabled
+          ? this.applyPersistedShuffle(questionList)
+          : questionList
+      orderedList.forEach((question, index) => {
+        question.displayOrder = index
         indexMap[question.itemOrder] = index
       })
-      this.orderedQuestions = questionList
+      this.orderedQuestions = orderedList
       this.questionIndexByOrder = indexMap
       this.currentQuestionIndex = 0
       this.ensureCurrentQuestionInRange()
+    },
+    applyPersistedShuffle(list) {
+      const arr = list.slice()
+      const key = this.getShuffleCacheKey()
+      const order = getOrCreateShuffledOrder(key, arr.length)
+      const shuffled = order.map(idx => arr[idx]).filter(Boolean)
+      return shuffled.length === arr.length ? shuffled : arr
+    },
+    resetShuffleCache() {
+      if (this.antiCheatEnabled) {
+        clearShuffledOrder(this.getShuffleCacheKey())
+      }
+    },
+    getShuffleCacheKey() {
+      const paperId = this.formData.paperId || this.$route.params.paperId || 'unknown'
+      const version = this.formData.updateTime || this.formData.paperInfoId || 'v1'
+      return `paper_shuffle_${paperId}_${version}`
+    },
+    getQuestionDisplayNumber(question) {
+      if (!question) {
+        return ''
+      }
+      if (this.antiCheatEnabled && typeof question.displayOrder === 'number') {
+        return question.displayOrder + 1
+      }
+      return (question.itemOrder || 0) + 1
+    },
+    getDisplayNumberByOrder(itemOrder) {
+      const index = this.questionIndexByOrder[itemOrder]
+      if (this.antiCheatEnabled && typeof index === 'number') {
+        return index + 1
+      }
+      return (itemOrder || 0) + 1
     },
     goToPrevQuestion() {
       if (this.currentQuestionIndex <= 0) return
@@ -637,17 +701,24 @@ export default {
       this.currentQuestionIndex++
       window.scrollTo({top: 0, behavior: 'smooth'})
     },
-    getQuestionTagType(itemOrder) {
-      // 在防作弊模式下，当前题目使用 primary 类型高亮
-      if (this.antiCheatActive && itemOrder === this.currentQuestionOrder) {
+    getQuestionTagType(itemOrder, displayIndex) {
+      if (this.antiCheatActive) {
+        const isCurrent = typeof displayIndex === 'number'
+            ? displayIndex === this.currentQuestionIndex
+            : itemOrder === this.currentQuestionOrder
+        if (isCurrent) {
+          return 'primary'
+        }
+      } else if (itemOrder === this.currentQuestionOrder) {
         return 'primary'
       }
-      // 其他情况按完成状态显示
       return this.answer.questionAnswerDtos[itemOrder].completed ? 'success' : 'plain'
     },
-    handleQuestionAnchorClick(itemOrder) {
+    handleQuestionAnchorClick(itemOrder, displayIndex) {
       if (this.antiCheatActive) {
-        const targetIndex = this.questionIndexByOrder[itemOrder]
+        const targetIndex = typeof displayIndex === 'number'
+            ? displayIndex
+            : this.questionIndexByOrder[itemOrder]
         if (typeof targetIndex === 'number') {
           this.currentQuestionIndex = targetIndex
           window.scrollTo({top: 0, behavior: 'smooth'})
@@ -692,6 +763,7 @@ export default {
     //点击确认提交答案的请求方法
     async sendSubmitAnswerRequest() {
       window.clearInterval(this.timer)
+      this.resetShuffleCache()
       const res = await submitAnswer(this.answer)
       if (res.code !== 200) {
         return

@@ -65,15 +65,15 @@ export default {
       return this.selectedYear === year; // 判断当前年份是否激活
     },
     gotoTest(paperId) {
-      console.log(111)
-      if (this.$route.params === paperId) {
+      if (!paperId) {
+        return
+      }
+      if (this.$route.params.paperId === paperId) {
         return
       }
       this.$router.push({
         name: 'paper',
-        query: {paperId}
-        // path:'/paper',
-        // query: {examId}
+        params: {paperId: String(paperId)}
       })
     }
   }
