@@ -22,6 +22,12 @@ export default {
       paperList: []
     };
   },
+  watch: {
+    '$route.params.subjectId'(val) {
+      this.formData.subjectId = val
+      this.getList()
+    }
+  },
   methods: {
     /** 查询试卷列表 */
     getList() {

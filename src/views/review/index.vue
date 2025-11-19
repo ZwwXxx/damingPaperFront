@@ -58,27 +58,49 @@
               </el-checkbox-group>
             </div>
             <div class="reviewInfo  p-6 flex flex-col text-sm">
-              <p class="leading-10">
-                <span v-if="question.questionType===1">  标准答案: {{ question.correct }}</span>
-                <span v-if="question.questionType===2">  标准答案: {{ question.correctArray }}</span>
-              </p>
-              <p class="leading-10">
-                你的答案:
-                <span v-if="question.questionType===1">{{
+              <div class="answer-row">
+                <span class="label">标准答案</span>
+                <span class="value" v-if="question.questionType===1">{{ question.correct }}</span>
+                <span class="value" v-else>{{ question.correctArray }}</span>
+              </div>
+              <div class="answer-row">
+                <span class="label">你的答案</span>
+                <span class="value" v-if="question.questionType===1">{{
                     paperAnswerDto.questionAnswerDtos[question.itemOrder].content
                   }}</span>
-                <span v-if="question.questionType===2">{{
+                <span class="value" v-else>{{
                     paperAnswerDto.questionAnswerDtos[question.itemOrder].contentArray
                   }}</span>
-              </p>
-              <p class="leading-10">结果:
-                <el-tag type="success" v-if="paperAnswerDto.questionAnswerDtos[question.itemOrder].correct">正确
+              </div>
+              <div class="answer-row">
+                <span class="label">结果</span>
+                <el-tag type="success" size="mini"
+                        v-if="paperAnswerDto.questionAnswerDtos[question.itemOrder].correct">正确
                 </el-tag>
-                <el-tag type="danger" v-else>错误</el-tag>
-              </p>
-              <p class="leading-10">解析:
-                {{ question.analysis }}
-              </p>
+                <el-tag type="danger" size="mini" v-else>错误</el-tag>
+              </div>
+              <div class="analysis-toggle">
+                <el-button
+                    size="mini"
+                    type="primary"
+                    plain
+                    @click="toggleAnalysis(question.itemOrder)">
+                  {{ expandedAnalysis[question.itemOrder] ? '收起解析' : '展开解析' }}
+                </el-button>
+              </div>
+              <transition name="fade">
+                <div class="analysis-wrap" v-if="expandedAnalysis[question.itemOrder]">
+                  <div class="analysis-header">
+                    <span class="title">解析</span>
+                  </div>
+                  <div
+                      class="analysis-content"
+                      v-if="question.analysis"
+                      v-html="question.analysis"
+                      :ref="'analysis-' + question.itemOrder"></div>
+                  <div class="analysis-empty" v-else>暂无解析</div>
+                </div>
+              </transition>
             </div>
           </div>
         </div>
@@ -86,7 +108,11 @@
 
 
         <ai :isCollapse="isCollapse" :needCollapse="true"></ai>
-
+        <el-image-viewer
+            v-if="imagePreview.visible"
+            :url-list="imagePreview.urls"
+            :initial-index="imagePreview.index"
+            :on-close="closeImagePreview"/>
 
     </wrapper>
   </div>
@@ -97,15 +123,15 @@ import wrapper from "@/components/wrapper.vue";
 import {getPaperAnswer} from "@/api/paperAnswer";
 import {formatSeconds} from "@/utils/time";
 import ai from "@/components/ai.vue";
-
-
+import ElImageViewer from "element-ui/packages/image/src/image-viewer";
 
 export default {
   name: "index",
   props: {},
   components: {
     wrapper,
-    ai
+    ai,
+    ElImageViewer
   },
 
   mounted() {
@@ -114,6 +140,9 @@ export default {
   created() {
     this.getPaperAnswerItem(this.$route.query.paperAnswerId)
     // this.getUserInfo()
+  },
+  beforeDestroy() {
+    this.unlockBodyScroll()
   },
 
   data() {
@@ -141,6 +170,17 @@ export default {
         },
       ],
       user: {},
+      expandedAnalysis: {},
+      imagePreview: {
+        visible: false,
+        urls: [],
+        index: 0
+      },
+      bodyScrollLocked: false,
+      originalBodyOverflow: '',
+      originalHtmlOverflow: '',
+      scrollPosition: 0,
+      preventScrollHandler: null
     }
   },
 
@@ -149,6 +189,72 @@ export default {
       const res = await getPaperAnswer(paperAnswerId)
       this.paperDto = res.data.paperDto
       this.paperAnswerDto = res.data.paperAnswerDto
+      this.expandedAnalysis = {}
+      this.$nextTick(() => this.bindAllAnalysisImages())
+    },
+    toggleAnalysis(itemOrder) {
+      this.$set(this.expandedAnalysis, itemOrder, !this.expandedAnalysis[itemOrder])
+      if (this.expandedAnalysis[itemOrder]) {
+        this.$nextTick(() => this.bindAnalysisImages(itemOrder))
+      }
+    },
+    bindAllAnalysisImages() {
+      if (!this.paperDto?.paperQuestionTypeDto) return
+      this.paperDto.paperQuestionTypeDto.forEach(type => {
+        type.questionDtos.forEach(q => this.bindAnalysisImages(q.itemOrder))
+      })
+    },
+    bindAnalysisImages(itemOrder) {
+      const ref = this.$refs[`analysis-${itemOrder}`]
+      const container = Array.isArray(ref) ? ref[0] : ref
+      if (!container) return
+      const imgs = container.querySelectorAll('img')
+      if (!imgs.length) return
+      const urlList = Array.from(imgs).map(img => img.src)
+      imgs.forEach((img, index) => {
+        img.style.cursor = 'zoom-in'
+        img.onclick = () => this.openImagePreview(urlList, index)
+      })
+    },
+    openImagePreview(urls, index) {
+      this.imagePreview.urls = urls
+      this.imagePreview.index = index
+      this.imagePreview.visible = true
+      this.lockBodyScroll()
+    },
+    closeImagePreview() {
+      this.imagePreview.visible = false
+      this.unlockBodyScroll()
+    },
+    lockBodyScroll() {
+      if (this.bodyScrollLocked) return
+      this.bodyScrollLocked = true
+      this.scrollPosition = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0
+      this.originalBodyOverflow = document.body.style.overflow
+      this.originalHtmlOverflow = document.documentElement.style.overflow
+      document.body.style.overflow = 'hidden'
+      document.documentElement.style.overflow = 'hidden'
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${this.scrollPosition}px`
+      document.body.style.width = '100%'
+      this.preventScrollHandler = e => e.preventDefault()
+      window.addEventListener('wheel', this.preventScrollHandler, { passive: false })
+      window.addEventListener('touchmove', this.preventScrollHandler, { passive: false })
+    },
+    unlockBodyScroll() {
+      if (!this.bodyScrollLocked) return
+      this.bodyScrollLocked = false
+      document.body.style.overflow = this.originalBodyOverflow || ''
+      document.documentElement.style.overflow = this.originalHtmlOverflow || ''
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      if (this.preventScrollHandler) {
+        window.removeEventListener('wheel', this.preventScrollHandler)
+        window.removeEventListener('touchmove', this.preventScrollHandler)
+        this.preventScrollHandler = null
+      }
+      window.scrollTo(0, this.scrollPosition || 0)
     },
 
     jumpTo(itemOrder) {
@@ -399,8 +505,62 @@ export default {
 </script>
 
 <style scoped>
->>> li {
-  list-style: disc;
+.answer-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
 }
-
+.answer-row .label {
+  width: 80px;
+  color: #666;
+}
+.answer-row .value {
+  color: #333;
+}
+.analysis-wrap {
+  margin-top: 12px;
+  background: #f8fbff;
+  border: 1px solid #d8e7ff;
+  border-radius: 6px;
+  padding: 12px;
+}
+.analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.analysis-header .title {
+  font-weight: 600;
+  color: #2f54eb;
+}
+.analysis-header .sub-tip {
+  font-size: 12px;
+  color: #9aa4c1;
+}
+.analysis-empty {
+  color: #999;
+}
+.analysis-toggle {
+  margin-top: 10px;
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity .2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+::v-deep .analysis-content ul {
+  list-style: disc;
+  margin-left: 20px;
+}
+::v-deep .analysis-content ol {
+  list-style: decimal;
+  margin-left: 20px;
+}
+::v-deep .analysis-content p {
+  margin: 4px 0;
+}
 </style>

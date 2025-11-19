@@ -155,7 +155,7 @@
     <!--右侧题目介绍，倒计时-->
     <el-card class="fixed top-20 right-0 w-1/4 ">
       <p class="paper-name font-bolder text-xl">
-        2024年广东专插本高等数学
+        {{ formData.paperName || '试卷详情' }}
       </p>
       <div class="desc py-4 text-md leading-8  ">
         <p class="">试卷总分: {{ formData.score }}</p>

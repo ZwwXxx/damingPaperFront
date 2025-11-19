@@ -2,38 +2,43 @@
   <wrapper>
     <!--头部介绍-->
     <div class=" text-center text-2xl font-bold p-4">科目</div>
-    <ul class="category flex space-x-2 ">
-      <li><a
-          @click.prevent="navigateTo(1)"
-          :class="[' rounded', isActive('/math') ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200 hover:text-red-500']"
-          class="block p-2   cursor-pointer rounded-md ">高等数学</a></li>
-      <li><a
-          @click.prevent="navigateTo(2)"
-          :class="[' rounded', isActive('/math') ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200 hover:text-red-500']"
-          class="block p-2   cursor-pointer rounded-md ">政治</a></li>
-      <li><a
-          @click.prevent="navigateTo(3)"
-          :class="[' rounded', isActive('/math') ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200 hover:text-red-500']"
-          class="block p-2   cursor-pointer rounded-md ">计算机基础与程序设计</a></li>
+    <ul class="category flex space-x-2 " v-if="subjectList.length">
+      <li v-for="subject in subjectList" :key="subject.subjectId">
+        <a
+          @click.prevent="navigateTo(subject.subjectId)"
+          :class="['rounded block p-2 cursor-pointer',
+            isActive(subject.subjectId) ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200 hover:text-red-500']"
+        >
+          {{ subject.subjectName }}
+        </a>
+      </li>
     </ul>
+    <div v-else class="text-center text-gray-500 py-6">暂无可用科目</div>
   </wrapper>
 </template>
 
 <script>
 // import {  } from "";
 import wrapper from "@/components/wrapper.vue";
+import {optionSubject} from "@/api/subject";
 
 export default {
   name: 'Home',
   components: {wrapper},
   data() {
-    return {};
+    return {
+      subjectList: []
+    };
   },
 
 
   methods: {
+    async fetchSubjects() {
+      const res = await optionSubject();
+      this.subjectList = res.data || [];
+    },
     navigateTo(subjectId) {
-      if (this.$route.path === subjectId) {
+      if (String(this.$route.params.subjectId || '') === String(subjectId)) {
         return
       }
       this.$router.push({
@@ -43,10 +48,13 @@ export default {
         // query: {articleId}
       }) // 使用 Vue Router 进行路由跳转
     },
-    isActive(path) {
-      return this.$route.path === path; // 判断当前路由是否匹配
+    isActive(subjectId) {
+      return String(this.$route.params.subjectId || '') === String(subjectId);
     }
   },
+  created() {
+    this.fetchSubjects();
+  }
 };
 </script>
 <style>

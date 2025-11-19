@@ -48,6 +48,7 @@
 <script>
 import {getPaperAnswerList} from "@/api/paperAnswer";
 import {formatSeconds} from "@/utils/time";
+import {optionSubject} from "@/api/subject";
 
 export default {
   name: "index",
@@ -58,22 +59,25 @@ export default {
       paperAnswerList: [],
       queryParam:{
         createUser:this.$store.getters['id']
-      }
+      },
+      subjectMap:{}
     }
   },
   created() {
+    this.loadSubjects();
     this.getPaperAnswerList()
   },
   methods: {
+    async loadSubjects() {
+      const res = await optionSubject()
+      const list = res.data || []
+      this.subjectMap = list.reduce((acc, cur) => {
+        acc[cur.subjectId] = cur.subjectName
+        return acc
+      }, {})
+    },
     transfer(subjectId) {
-      if (subjectId === 1) {
-        return "高等数学"
-      } else if (subjectId === 2) {
-        return "政治"
-      } else if (subjectId === 3) {
-        return "计算机基础与程序设计"
-      }
-
+      return this.subjectMap[subjectId] || '-'
     },
     formatSeconds(seconds) {
       return formatSeconds(seconds)
