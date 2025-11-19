@@ -752,6 +752,39 @@ export default {
       }
     },
 
+    updateCurrentQuestionByScroll() {
+      if (this.antiCheatActive) {
+        return
+      }
+      const typeList = this.formData.paperQuestionTypeDto || []
+      if (!Array.isArray(typeList) || !typeList.length) {
+        return
+      }
+      const anchorTop = 120
+      let nearestOrder = this.scrollCurrentQuestionOrder
+      let minDistance = Number.POSITIVE_INFINITY
+      typeList.forEach(type => {
+        (type.questionDtos || []).forEach(question => {
+          const el = document.getElementById(question.itemOrder)
+          if (!el) {
+            return
+          }
+          const rect = el.getBoundingClientRect()
+          if (rect.bottom < 0 || rect.top > window.innerHeight) {
+            return
+          }
+          const distance = Math.abs(rect.top - anchorTop)
+          if (distance < minDistance) {
+            minDistance = distance
+            nearestOrder = question.itemOrder
+          }
+        })
+      })
+      if (nearestOrder !== this.scrollCurrentQuestionOrder) {
+        this.scrollCurrentQuestionOrder = nearestOrder
+      }
+    },
+
     async getPaperById(paperId) {
       this.formData = (await getPaper(paperId)).data
       // 后端下发试卷时若带有开关字段，则以其为准
