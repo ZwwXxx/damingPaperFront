@@ -16,7 +16,7 @@
               v-for="(question, qIndex) in questType.questionDtos" :key="qIndex"
               :type="getQuestionTagType(question.itemOrder)"
               style="padding: 0; display: flex; justify-content: center; width:  calc(20% - 10px); height: 30px;margin: 5px"
-              :class="['cursor-pointer', {'current-question': antiCheatActive && question.itemOrder === currentQuestionOrder}]">
+              :class="['cursor-pointer', {'current-question': question.itemOrder === currentQuestionOrder}]">
             {{ getDisplayNumberByOrder(question.itemOrder) }}
           </el-tag>
         </div>
@@ -71,10 +71,10 @@
             <el-radio-group
                 v-if="questionItem.questionType===1"
                 v-removeAria
-                v-model="answer.questionAnswerDtos[questionItem.itemOrder].content"
-                @change="answer.questionAnswerDtos[questionItem.itemOrder].completed = true">
+                v-model="answer.questionAnswerDtos[questionItem.itemOrder].content">
               <el-radio class="py-2" :label="selection.prefix"
-                        v-for="(selection,index) in questionItem.items" :key="index">
+                        v-for="(selection,index) in questionItem.items" :key="index"
+                        @click.native="handleSingleOptionClick(questionItem.itemOrder, selection.prefix)">
                 {{ selection.prefix }}.{{ selection.content }}
               </el-radio>
             </el-radio-group>
@@ -116,10 +116,10 @@
             <el-radio-group
                 v-if="currentQuestion.questionType===1"
                 v-removeAria
-                v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content"
-                @change="answer.questionAnswerDtos[currentQuestion.itemOrder].completed = true">
+                v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content">
               <el-radio class="py-2" :label="selection.prefix"
-                        v-for="(selection,index) in currentQuestion.items" :key="index">
+                        v-for="(selection,index) in currentQuestion.items" :key="index"
+                        @click.native="handleSingleOptionClick(currentQuestion.itemOrder, selection.prefix)">
                 {{ selection.prefix }}.{{ selection.content }}
               </el-radio>
             </el-radio-group>
@@ -187,6 +187,7 @@ export default {
   props: {},
   mounted() {
     this.syncAntiCheatState()
+    window.addEventListener('scroll', this.updateCurrentQuestionByScroll)
   },
   created() {
     const paramsId = this.$route.params.paperId
@@ -224,6 +225,7 @@ export default {
       browserEnvironmentTimer: null,
       radio: '',
       formData: {},
+      scrollCurrentQuestionOrder: -1,
       //试卷的回答,包含耗时和 该回答记录的id，和回答的所有问题集合
       answer: {
         doTime: 0,
@@ -250,6 +252,7 @@ export default {
   beforeDestroy() {
     window.clearInterval(this.timer)
     this.disableAntiCheatFeatures()
+    window.removeEventListener('scroll', this.updateCurrentQuestionByScroll)
   },
   beforeRouteLeave(to, from, next) {
     this.resetShuffleCache()
@@ -265,7 +268,10 @@ export default {
       return this.orderedQuestions[this.currentQuestionIndex] || null
     },
     currentQuestionOrder() {
-      return this.currentQuestion ? this.currentQuestion.itemOrder : -1
+      if (this.antiCheatActive) {
+        return this.currentQuestion ? this.currentQuestion.itemOrder : -1
+      }
+      return this.scrollCurrentQuestionOrder
     }
   },
   methods: {
@@ -588,7 +594,19 @@ export default {
         console.log('目标元素未找到');
       }
     },
-
+    handleSingleOptionClick(itemOrder, option) {
+      const answer = this.answer.questionAnswerDtos[itemOrder]
+      if (!answer) {
+        return
+      }
+      if (answer.content === option) {
+        answer.content = null
+        answer.completed = false
+      } else {
+        answer.content = option
+        answer.completed = true
+      }
+    },
     updateCompletedStatus(itemOrder) {
       const contentArray = this.answer.questionAnswerDtos[itemOrder].contentArray;
       this.answer.questionAnswerDtos[itemOrder].completed = contentArray.length > 0;
@@ -632,6 +650,12 @@ export default {
         }
       }
       this.buildQuestionCache()
+      const firstType = (paperQuestionTypeList || [])[0]
+      const firstQuestion = firstType && (firstType.questionDtos || [])[0]
+      this.scrollCurrentQuestionOrder = firstQuestion ? firstQuestion.itemOrder : -1
+      this.$nextTick(() => {
+        this.updateCurrentQuestionByScroll()
+      })
     },
     buildQuestionCache() {
       let questionList = []
