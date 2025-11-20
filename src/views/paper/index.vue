@@ -71,10 +71,11 @@
             <el-radio-group
                 v-if="questionItem.questionType===1"
                 v-removeAria
-                v-model="answer.questionAnswerDtos[questionItem.itemOrder].content">
+                v-model="answer.questionAnswerDtos[questionItem.itemOrder].content"
+                @change="handleSingleChange(questionItem.itemOrder)">
               <el-radio class="py-2" :label="selection.prefix"
                         v-for="(selection,index) in questionItem.items" :key="index"
-                        @click.native="handleSingleOptionClick(questionItem.itemOrder, selection.prefix)">
+                        @click.native="handleSingleOptionClick(questionItem.itemOrder, selection.prefix, $event)">
                 {{ selection.prefix }}.{{ selection.content }}
               </el-radio>
             </el-radio-group>
@@ -116,10 +117,11 @@
             <el-radio-group
                 v-if="currentQuestion.questionType===1"
                 v-removeAria
-                v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content">
+                v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content"
+                @change="handleSingleChange(currentQuestion.itemOrder)">
               <el-radio class="py-2" :label="selection.prefix"
                         v-for="(selection,index) in currentQuestion.items" :key="index"
-                        @click.native="handleSingleOptionClick(currentQuestion.itemOrder, selection.prefix)">
+                        @click.native="handleSingleOptionClick(currentQuestion.itemOrder, selection.prefix, $event)">
                 {{ selection.prefix }}.{{ selection.content }}
               </el-radio>
             </el-radio-group>
@@ -594,18 +596,26 @@ export default {
         console.log('目标元素未找到');
       }
     },
-    handleSingleOptionClick(itemOrder, option) {
+    handleSingleOptionClick(itemOrder, option, event) {
       const answer = this.answer.questionAnswerDtos[itemOrder]
       if (!answer) {
         return
       }
       if (answer.content === option) {
+        if (event) {
+          event.preventDefault()
+          event.stopPropagation()
+        }
         answer.content = null
         answer.completed = false
-      } else {
-        answer.content = option
-        answer.completed = true
       }
+    },
+    handleSingleChange(itemOrder) {
+      const answer = this.answer.questionAnswerDtos[itemOrder]
+      if (!answer) {
+        return
+      }
+      answer.completed = !!answer.content
     },
     updateCompletedStatus(itemOrder) {
       const contentArray = this.answer.questionAnswerDtos[itemOrder].contentArray;
