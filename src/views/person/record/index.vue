@@ -45,7 +45,7 @@
           :key="paperAnswer.paperAnswerId">
         <div class="header p-4 bg-gray-100 flex justify-between items-center">
           <span class="font-semibold text-lg text-gray-800">{{ paperAnswer.paperName }}</span>
-          <el-tag size="mini" type="success">已完成</el-tag>
+          <el-tag size="mini" :type="statusTagType(paperAnswer)">{{ statusText(paperAnswer) }}</el-tag>
         </div>
         <div class="detailDesc text-sm p-6 flex flex-wrap">
           <ul class="mr-8">
@@ -55,7 +55,8 @@
           </ul>
           <ul class="mr-8">
             <li><p class="leading-8">总分: {{ paperAnswer.paperScore }}</p></li>
-            <li><p class="leading-8">得分: {{ paperAnswer.finalScore }}</p></li>
+            <li><p class="leading-8">得分: {{ scoreText(paperAnswer) }}</p></li>
+            <li v-if="paperAnswer.objectiveScore != null"><p class="leading-8">客观题: {{ paperAnswer.objectiveScore }}</p></li>
             <li><p class="leading-8">正确题数: {{ paperAnswer.correctCount }}</p></li>
           </ul>
           <ul>
@@ -104,6 +105,15 @@ export default {
     this.getPaperAnswerList()
   },
   methods: {
+    statusTagType(paperAnswer) {
+      return paperAnswer.reviewStatus === 1 ? 'warning' : 'success'
+    },
+    statusText(paperAnswer) {
+      return paperAnswer.reviewStatus === 1 ? '待批改' : '已完成'
+    },
+    scoreText(paperAnswer) {
+      return paperAnswer.reviewStatus === 1 ? '老师批改中' : paperAnswer.finalScore
+    },
     async loadSubjects() {
       const res = await optionSubject()
       const list = res.data || []

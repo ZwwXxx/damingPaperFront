@@ -10,7 +10,9 @@
       <el-card class="fixed top-20 left-0 w-1/4 ">
         <p class="mb-5 text-xl">{{ paperDto.paperName }}</p>
         <div class="text-md mb-5 border-b">
-          <p class="leading-8">试卷得分: {{ paperAnswerDto.finalScore }}/{{ paperDto.score }}</p>
+          <p class="leading-8" v-if="paperAnswerDto.reviewStatus === 2">试卷得分: {{ paperAnswerDto.finalScore }}/{{ paperDto.score }}</p>
+          <p class="leading-8" v-else>试卷含主观题正在等待老师批改</p>
+          <p class="leading-8" v-if="paperAnswerDto.objectiveScore != null">客观题得分: {{ paperAnswerDto.objectiveScore }}</p>
           <p class="leading-8">耗时: {{ formatSeconds(paperAnswerDto.doTime) }}</p>
         </div>
         <div v-for="(questionType,index) in paperDto.paperQuestionTypeDto" :key="index">

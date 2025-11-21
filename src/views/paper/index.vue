@@ -71,10 +71,10 @@
             <el-radio-group
                 v-if="questionItem.questionType===1"
                 v-removeAria
-                v-model="answer.questionAnswerDtos[questionItem.itemOrder].content">
+                v-model="answer.questionAnswerDtos[questionItem.itemOrder].content"
+                @change="handleSingleRadioChange(questionItem.itemOrder, $event)">
               <el-radio class="py-2" :label="selection.prefix"
-                        v-for="(selection,index) in questionItem.items" :key="index"
-                        @click.native="handleSingleOptionClick(questionItem.itemOrder, selection.prefix)">
+                        v-for="(selection,index) in questionItem.items" :key="index">
                 {{ selection.prefix }}.{{ selection.content }}
               </el-radio>
             </el-radio-group>
@@ -96,13 +96,13 @@
                 {{ selection.prefix }}.{{ selection.content }}
               </el-radio>
             </el-radio-group>
-            <el-input
+            <rich-text-editor
                 v-if="questionItem.questionType===3"
-                type="textarea"
-                :rows="4"
-                placeholder="请输入答案"
+                class="answer-rich-text"
+                :min-height="220"
+                :placeholder="'请输入答案（可插入图片、富文本）'"
                 v-model="answer.questionAnswerDtos[questionItem.itemOrder].content"
-                @input="handleTextChange(questionItem.itemOrder)"/>
+                @on-change="handleTextChange(questionItem.itemOrder, $event)"/>
           </div>
         </div>
       </div>
@@ -133,10 +133,10 @@
             <el-radio-group
                 v-if="currentQuestion.questionType===1"
                 v-removeAria
-                v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content">
+                v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content"
+                @change="handleSingleRadioChange(currentQuestion.itemOrder, $event)">
               <el-radio class="py-2" :label="selection.prefix"
-                        v-for="(selection,index) in currentQuestion.items" :key="index"
-                        @click.native="handleSingleOptionClick(currentQuestion.itemOrder, selection.prefix)">
+                        v-for="(selection,index) in currentQuestion.items" :key="index">
                 {{ selection.prefix }}.{{ selection.content }}
               </el-radio>
             </el-radio-group>
@@ -158,13 +158,13 @@
                 {{ selection.prefix }}.{{ selection.content }}
               </el-radio>
             </el-radio-group>
-            <el-input
+            <rich-text-editor
                 v-if="currentQuestion.questionType===3"
-                type="textarea"
-                :rows="4"
-                placeholder="请输入答案"
+                class="answer-rich-text"
+                :min-height="220"
+                :placeholder="'请输入答案（可插入图片、富文本）'"
                 v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content"
-                @input="handleTextChange(currentQuestion.itemOrder)"/>
+                @on-change="handleTextChange(currentQuestion.itemOrder, $event)"/>
           </div>
         </div>
         <div class="question-navigation flex justify-between items-center p-4">
@@ -211,6 +211,7 @@
 
 <script>
   import wrapper from "@/components/wrapper.vue";
+  import RichTextEditor from "@/components/RichTextEditor.vue";
   import {getPaper} from "@/api/paper";
   import {submitAnswer} from "@/api/paperAnswer";
   import {formatSeconds} from "@/utils/time"
@@ -233,7 +234,7 @@ export default {
       this.$router.replace({path: '/home'})
     }
   },
-  components: {wrapper},
+  components: {wrapper, RichTextEditor},
   data() {
     return {
       timer: undefined,
@@ -645,18 +646,11 @@ export default {
         console.log('目标元素未找到');
       }
     },
-    handleSingleOptionClick(itemOrder, option) {
+    handleSingleRadioChange(itemOrder, option) {
       const answer = this.answer.questionAnswerDtos[itemOrder]
-      if (!answer) {
-        return
-      }
-      if (answer.content === option) {
-        answer.content = null
-        answer.completed = false
-      } else {
-        answer.content = option
-        answer.completed = true
-      }
+      if (!answer) return
+      answer.content = option
+      answer.completed = true
     },
     updateCompletedStatus(itemOrder) {
       const answer = this.answer.questionAnswerDtos[itemOrder];
@@ -667,10 +661,14 @@ export default {
         answer.completed = !!(answer.content && answer.content.toString().trim());
       }
     },
-    handleTextChange(itemOrder) {
+    handleTextChange(itemOrder, payload = {}) {
       const answer = this.answer.questionAnswerDtos[itemOrder];
       if (!answer) return;
-      answer.completed = !!(answer.content && answer.content.toString().trim());
+      const html = Object.prototype.hasOwnProperty.call(payload, 'html') ? payload.html : answer.content || ''
+      const text = typeof payload.text === 'string' ? payload.text : ''
+      answer.content = html
+      const plainText = text || html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ')
+      answer.completed = !!(plainText && plainText.trim());
     },
     // 格式化日期为时分秒
     formatSeconds(remainTime) {
@@ -703,7 +701,7 @@ export default {
           let question = questionArray[qIndex]
           this.answer.questionAnswerDtos.push({
             questionId: question.id,
-            content: null,//后续radio勾选后录入
+            content: '',//后续radio勾选后录入
             contentArray: [],//同上
             completed: false,//同上
             itemOrder: question.itemOrder
@@ -886,9 +884,23 @@ export default {
       if (res.code !== 200) {
         return
       }
-      // console.log(res.data)
-      // 如果服务器响应成功，经过了响应拦截器处理拿到200数据，不需要再做判断了，直接拿data即可
-      this.$alert(`试卷总得分:${res.data}`, '考试结果', {
+      const rawResult = res.data
+      const fallbackScore = typeof rawResult === 'number' ? rawResult : 0
+      const result = (rawResult && typeof rawResult === 'object')
+          ? rawResult
+          : {
+            reviewStatus: 0,
+            finalScore: fallbackScore,
+            objectiveScore: fallbackScore
+          }
+      let message = ''
+      if (result.reviewStatus === 1) {
+        const objective = result.objectiveScore != null ? result.objectiveScore : 0
+        message = `客观题得分：${objective} 分，主观题将由老师批改，请耐心等待。`
+      } else {
+        message = `试卷总得分：${result.finalScore}`
+      }
+      this.$alert(message, '考试结果', {
         confirmButtonText: '查看此次考试详情',
         cancelButtonText: '取消', // 添加取消按钮
         showClose: false, // 禁用右上角关闭按钮
@@ -945,5 +957,32 @@ export default {
   text-align: center;
   z-index: 10000;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.answer-rich-text {
+  margin-top: 12px;
+  width: 100%;
+}
+.answer-rich-text .ql-toolbar {
+  border-radius: 6px 6px 0 0;
+}
+.answer-rich-text .ql-container {
+  border-radius: 0 0 6px 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.answer-rich-text .ql-editor {
+  width: 100%;
+  box-sizing: border-box;
+  display: block;
+  padding: 16px;
+}
+.answer-rich-text .ql-editor::before {
+  width: 100%;
+  display: block;
+  left: 16px;
+  right: 16px;
+}
+.answer-rich-text .ql-editor p {
+  min-height: 20px;
 }
 </style>
