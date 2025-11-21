@@ -27,6 +27,13 @@
               unlink-panels
               style="width: 260px"/>
         </el-form-item>
+        <el-form-item label="错题次数">
+          <el-select v-model="filters.sortOrder" placeholder="请选择排序" style="width: 180px" @change="handleSortChange">
+            <el-option label="默认" value="default"/>
+            <el-option label="次数从高到低" value="desc"/>
+            <el-option label="次数从低到高" value="asc"/>
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
@@ -43,7 +50,10 @@
             <p class="text-xs text-gray-500 mt-1">
               试卷：{{ item.paperName || '-' }} ｜ 科目：{{ transferSubject(item.subjectId) }} ｜ 上次作答：{{ item.createTime || '-' }}
             </p>
-            <p class="text-xs text-red-500 mt-1" v-if="item.wrongCount > 1">累计错题次数：{{ item.wrongCount }}</p>
+            <p class="error-count" v-if="item.wrongCount > 1">
+              <span class="label">累计错题次数</span>
+              <span class="value">{{ item.wrongCount }}</span>
+            </p>
           </div>
           <el-tag type="danger">答错</el-tag>
         </div>
@@ -89,7 +99,8 @@ export default {
       filters: {
         paperName: '',
         subjectId: '',
-        dateRange: []
+        dateRange: [],
+        sortOrder: 'default'
       },
       queryParam: {
         createUser: this.$store.getters['id']
@@ -123,13 +134,29 @@ export default {
         params.beginTime = this.filters.dateRange[0]
         params.endTime = this.filters.dateRange[1]
       }
+      if (this.filters.sortOrder && this.filters.sortOrder !== 'default') {
+        params.sortOrder = this.filters.sortOrder
+      }
       return params
+    },
+    applySort(list) {
+      const order = this.filters.sortOrder
+      if (!Array.isArray(list) || order === 'default') {
+        return list
+      }
+      const sorted = [...list]
+      sorted.sort((a, b) => {
+        const aCount = Number(a.wrongCount) || 0
+        const bCount = Number(b.wrongCount) || 0
+        return order === 'asc' ? aCount - bCount : bCount - aCount
+      })
+      return sorted
     },
     async getWrongList() {
       this.loading = true
       try {
         const res = await getWrongQuestionList(this.buildQuery())
-        this.wrongList = res.data || []
+        this.wrongList = this.applySort(res.data || [])
       } finally {
         this.loading = false
       }
@@ -141,9 +168,13 @@ export default {
       this.filters = {
         paperName: '',
         subjectId: '',
-        dateRange: []
+        dateRange: [],
+        sortOrder: 'default'
       }
       this.getWrongList()
+    },
+    handleSortChange() {
+      this.wrongList = this.applySort(this.wrongList)
     },
     gotoReview(paperAnswerId) {
       if (!paperAnswerId) {
@@ -175,6 +206,30 @@ export default {
 <style scoped>
 .wrong-card {
   border: 1px solid #e5e7eb;
+}
+.error-count {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #b91c1c;
+}
+.error-count .label {
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 2px 8px;
+  border-top-left-radius: 999px;
+  border-bottom-left-radius: 999px;
+  border: 1px solid #fecaca;
+}
+.error-count .value {
+  background: #dc2626;
+  color: #fff;
+  padding: 2px 10px;
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
+  border: 1px solid #dc2626;
 }
 </style>
 

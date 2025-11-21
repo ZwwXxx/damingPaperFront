@@ -21,8 +21,9 @@
                 v-for="(question, qIndex) in questionType.questionDtos" :key="qIndex"
                 :type="paperAnswerDto.questionAnswerDtos[question.itemOrder].correct?'success':'danger'"
                 style="padding: 0; display: flex; justify-content: center; width:  calc(20% - 10px); height: 30px;margin: 5px"
-                class="cursor-pointer ">
-              {{ qIndex + 1 }}  <!-- 使用 qIndex 递增标签 -->
+                class="cursor-pointer"
+                :class="{'tag-active': activeQuestionOrder === question.itemOrder}">
+              {{ question.itemOrder + 1 }}
             </el-tag>
           </div>
         </div>
@@ -143,6 +144,7 @@ export default {
   },
   beforeDestroy() {
     this.unlockBodyScroll()
+    this.removeScrollSpy()
   },
 
   data() {
@@ -180,7 +182,9 @@ export default {
       originalBodyOverflow: '',
       originalHtmlOverflow: '',
       scrollPosition: 0,
-      preventScrollHandler: null
+      preventScrollHandler: null,
+      activeQuestionOrder: null,
+      scrollListener: null
     }
   },
 
@@ -190,7 +194,10 @@ export default {
       this.paperDto = res.data.paperDto
       this.paperAnswerDto = res.data.paperAnswerDto
       this.expandedAnalysis = {}
-      this.$nextTick(() => this.bindAllAnalysisImages())
+      this.$nextTick(() => {
+        this.bindAllAnalysisImages()
+        this.setupScrollSpy()
+      })
     },
     toggleAnalysis(itemOrder) {
       this.$set(this.expandedAnalysis, itemOrder, !this.expandedAnalysis[itemOrder])
@@ -255,6 +262,39 @@ export default {
         this.preventScrollHandler = null
       }
       window.scrollTo(0, this.scrollPosition || 0)
+    },
+
+    setupScrollSpy() {
+      this.removeScrollSpy()
+      this.$nextTick(() => {
+        this.handleScrollSpy()
+        this.scrollListener = () => this.handleScrollSpy()
+        window.addEventListener('scroll', this.scrollListener, {passive: true})
+      })
+    },
+    removeScrollSpy() {
+      if (this.scrollListener) {
+        window.removeEventListener('scroll', this.scrollListener)
+        this.scrollListener = null
+      }
+    },
+    handleScrollSpy() {
+      const titles = Array.from(document.querySelectorAll('.question-item .q-title'))
+      if (!titles.length) {
+        this.activeQuestionOrder = null
+        return
+      }
+      const offset = 140
+      let currentId = titles[0].id
+      for (const node of titles) {
+        const rect = node.getBoundingClientRect()
+        if (rect.top - offset <= 0) {
+          currentId = node.id
+        } else {
+          break
+        }
+      }
+      this.activeQuestionOrder = currentId !== undefined ? Number(currentId) : null
     },
 
     jumpTo(itemOrder) {
@@ -551,6 +591,10 @@ export default {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+.question-anchor .tag-active {
+  box-shadow: 0 0 0 2px #409EFF inset;
+  transform: scale(1.02);
 }
 ::v-deep .analysis-content ul {
   list-style: disc;
