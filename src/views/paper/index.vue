@@ -9,7 +9,7 @@
     <el-card class="fixed top-20 left-0 w-1/4 ">
       <template v-if="!antiCheatActive">
         <div class="questType" v-for="(questType,index) in formData.paperQuestionTypeDto" :key=index>
-          <p class="mb-2">{{ questType.name }}</p>
+          <p class="mb-2">{{ getQuestionTypeName(questType) }}</p>
         <div class="question-anchor  flex flex-wrap  ">
           <el-tag
               @click="handleQuestionAnchorClick(question.itemOrder)"
@@ -43,7 +43,7 @@
     <div class="container" v-if="!antiCheatActive">
       <div class="questionTypeBody" v-for="(questType,index)  in formData.paperQuestionTypeDto" :key="index">
         <div class="part bg-gray-100 p-4 text-black">
-          {{ questType.name }}
+          {{ getQuestionTypeName(questType) }}
         </div>
         <div class="question-item p-4" v-for="(questionItem,index) in questType.questionDtos" :key="index">
           <div class="q-title">
@@ -86,6 +86,23 @@
                 {{ checkBox.prefix }}
               </el-checkbox>
             </el-checkbox-group>
+            <el-radio-group
+                v-if="questionItem.questionType===4"
+                v-model="answer.questionAnswerDtos[questionItem.itemOrder].content"
+                @change="updateCompletedStatus(questionItem.itemOrder)"
+                v-removeAria>
+              <el-radio class="py-2" :label="selection.prefix"
+                        v-for="(selection,index) in questionItem.items" :key="index">
+                {{ selection.prefix }}.{{ selection.content }}
+              </el-radio>
+            </el-radio-group>
+            <el-input
+                v-if="questionItem.questionType===3"
+                type="textarea"
+                :rows="4"
+                placeholder="请输入答案"
+                v-model="answer.questionAnswerDtos[questionItem.itemOrder].content"
+                @input="handleTextChange(questionItem.itemOrder)"/>
           </div>
         </div>
       </div>
@@ -131,6 +148,23 @@
                 {{ checkBox.prefix }}
               </el-checkbox>
             </el-checkbox-group>
+            <el-radio-group
+                v-if="currentQuestion.questionType===4"
+                v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content"
+                @change="updateCompletedStatus(currentQuestion.itemOrder)"
+                v-removeAria>
+              <el-radio class="py-2" :label="selection.prefix"
+                        v-for="(selection,index) in currentQuestion.items" :key="index">
+                {{ selection.prefix }}.{{ selection.content }}
+              </el-radio>
+            </el-radio-group>
+            <el-input
+                v-if="currentQuestion.questionType===3"
+                type="textarea"
+                :rows="4"
+                placeholder="请输入答案"
+                v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content"
+                @input="handleTextChange(currentQuestion.itemOrder)"/>
           </div>
         </div>
         <div class="question-navigation flex justify-between items-center p-4">
@@ -245,7 +279,13 @@ export default {
         {
           id: null, content: '', contentArray: []
         }
-      ]
+      ],
+      questionTypeNameMap: {
+        1: '单选题',
+        2: '多选题',
+        3: '主观题',
+        4: '判断题'
+      }
     }
   },
   // 组件销毁时清空定时器
@@ -275,6 +315,17 @@ export default {
     }
   },
   methods: {
+    getQuestionTypeName(questType) {
+      const rawType = questType && (questType.questionType || questType.type);
+      const name = questType && questType.name;
+      const numericName = name && !isNaN(name) ? Number(name) : null;
+      if (name && isNaN(name)) {
+        return name;
+      }
+      const map = this.questionTypeNameMap || {};
+      const resolvedType = rawType || numericName;
+      return map[resolvedType] || name || '';
+    },
     syncAntiCheatState() {
       if (this.antiCheatEnabled) {
         this.enableAntiCheatFeatures()
@@ -608,8 +659,18 @@ export default {
       }
     },
     updateCompletedStatus(itemOrder) {
-      const contentArray = this.answer.questionAnswerDtos[itemOrder].contentArray;
-      this.answer.questionAnswerDtos[itemOrder].completed = contentArray.length > 0;
+      const answer = this.answer.questionAnswerDtos[itemOrder];
+      if (!answer) return;
+      if (Array.isArray(answer.contentArray)) {
+        answer.completed = answer.contentArray.length > 0;
+      } else {
+        answer.completed = !!(answer.content && answer.content.toString().trim());
+      }
+    },
+    handleTextChange(itemOrder) {
+      const answer = this.answer.questionAnswerDtos[itemOrder];
+      if (!answer) return;
+      answer.completed = !!(answer.content && answer.content.toString().trim());
     },
     // 格式化日期为时分秒
     formatSeconds(remainTime) {
@@ -665,7 +726,7 @@ export default {
         (type.questionDtos || []).forEach((question) => {
           questionList.push({
             ...question,
-            questTypeName: type.name
+            questTypeName: this.getQuestionTypeName(type)
           })
         })
       })

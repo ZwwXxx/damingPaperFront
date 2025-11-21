@@ -13,7 +13,7 @@
         <li>
           <a
               @click="swtichContent('/person/info')"
-              :class="[' rounded flex p-3 px-4  rounded-2xl items-baseline   cursor-pointer', isActive('/person/info') ? 'bg-blue-500 text-white' : '']"
+              :class="['flex p-3 px-4 rounded-2xl items-baseline cursor-pointer', isActive('/person/info') ? 'bg-blue-500 text-white' : '']"
           >
             <i class="fa fa-book mr-4"></i>
             <span>个人信息</span>
@@ -22,9 +22,17 @@
         <li>
           <a
               @click="swtichContent('/person/record')"
-              :class="[' rounded flex p-3 px-4  rounded-2xl items-baseline   cursor-pointer', isActive('/person/record') ? ' bg-blue-500 text-white' : 'flex p-3 px-4  rounded-2xl items-baseline cursor-pointer']">
+              :class="['flex p-3 px-4 rounded-2xl items-baseline cursor-pointer', isActive('/person/record') ? ' bg-blue-500 text-white' : '']">
             <i class="fa fa-book mr-4"></i>
             <span>考试记录</span>
+          </a>
+        </li>
+        <li>
+          <a
+              @click="swtichContent('/person/wrong')"
+              :class="['flex p-3 px-4 rounded-2xl items-baseline cursor-pointer', isActive('/person/wrong') ? ' bg-blue-500 text-white' : '']">
+            <i class="fa fa-times mr-4"></i>
+            <span>错题记录</span>
           </a>
         </li>
       </ul>

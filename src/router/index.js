@@ -37,6 +37,11 @@ const routes = [
                         path: 'record',
                         name: 'record',
                         component: () => import('@/views/person/record/index.vue'),
+                    },
+                    {
+                        path: 'wrong',
+                        name: 'wrong',
+                        component: () => import('@/views/person/wrong/index.vue'),
                     }
                 ]
             },
