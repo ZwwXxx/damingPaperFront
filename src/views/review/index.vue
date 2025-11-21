@@ -80,13 +80,20 @@
                 </el-tag>
                 <el-tag type="danger" size="mini" v-else>错误</el-tag>
               </div>
-              <div class="analysis-toggle">
+              <div class="action-row">
                 <el-button
                     size="mini"
                     type="primary"
                     plain
                     @click="toggleAnalysis(question.itemOrder)">
                   {{ expandedAnalysis[question.itemOrder] ? '收起解析' : '展开解析' }}
+                </el-button>
+                <el-button
+                    size="mini"
+                    plain
+                    :type="isFavorite(question.id) ? 'warning' : 'info'"
+                    @click="toggleFavorite(question)">
+                  {{ isFavorite(question.id) ? '已收藏' : '收藏' }}
                 </el-button>
               </div>
               <transition name="fade">
@@ -125,6 +132,7 @@ import {getPaperAnswer} from "@/api/paperAnswer";
 import {formatSeconds} from "@/utils/time";
 import ai from "@/components/ai.vue";
 import ElImageViewer from "element-ui/packages/image/src/image-viewer";
+import {addFavorite, getFavoriteList, removeFavorite} from "@/api/questionFavorite";
 
 export default {
   name: "index",
@@ -139,7 +147,9 @@ export default {
 
   },
   created() {
-    this.getPaperAnswerItem(this.$route.query.paperAnswerId)
+    this.paperAnswerId = this.$route.query.paperAnswerId
+    this.getPaperAnswerItem(this.paperAnswerId)
+    this.loadFavoriteQuestionIds()
     // this.getUserInfo()
   },
   beforeDestroy() {
@@ -184,7 +194,9 @@ export default {
       scrollPosition: 0,
       preventScrollHandler: null,
       activeQuestionOrder: null,
-      scrollListener: null
+      scrollListener: null,
+      paperAnswerId: null,
+      favoriteMap: {}
     }
   },
 
@@ -198,6 +210,53 @@ export default {
         this.bindAllAnalysisImages()
         this.setupScrollSpy()
       })
+    },
+    async loadFavoriteQuestionIds() {
+      if (!this.paperAnswerId) {
+        return
+      }
+      try {
+        const res = await getFavoriteList({paperAnswerId: this.paperAnswerId})
+        const ids = res.data || []
+        const map = {}
+        ids.forEach(id => {
+          map[id] = true
+        })
+        this.favoriteMap = map
+      } catch (error) {
+        console.error('获取收藏列表失败', error)
+      }
+    },
+    isFavorite(questionId) {
+      if (!questionId) {
+        return false
+      }
+      return !!this.favoriteMap[questionId]
+    },
+    async toggleFavorite(question) {
+      if (!question || !question.id) {
+        return
+      }
+      const questionId = question.id
+      const isFav = this.isFavorite(questionId)
+      try {
+        if (isFav) {
+          await removeFavorite(questionId)
+          this.$delete(this.favoriteMap, questionId)
+          this.$message.success('已取消收藏')
+        } else {
+          await addFavorite({
+            questionId,
+            paperAnswerId: this.paperAnswerId,
+            paperId: this.paperDto?.paperId,
+            subjectId: question.subjectId || this.paperDto?.subjectId
+          })
+          this.$set(this.favoriteMap, questionId, true)
+          this.$message.success('收藏成功')
+        }
+      } catch (error) {
+        console.error('收藏操作失败', error)
+      }
     },
     toggleAnalysis(itemOrder) {
       this.$set(this.expandedAnalysis, itemOrder, !this.expandedAnalysis[itemOrder])
@@ -581,8 +640,10 @@ export default {
 .analysis-empty {
   color: #999;
 }
-.analysis-toggle {
+.action-row {
   margin-top: 10px;
+  display: flex;
+  gap: 8px;
 }
 .fade-enter-active,
 .fade-leave-active {

@@ -35,6 +35,14 @@
             <span>错题记录</span>
           </a>
         </li>
+        <li>
+          <a
+              @click="swtichContent('/person/favorite')"
+              :class="['flex p-3 px-4 rounded-2xl items-baseline cursor-pointer', isActive('/person/favorite') ? ' bg-blue-500 text-white' : '']">
+            <i class="fa fa-star mr-4"></i>
+            <span>收藏题目</span>
+          </a>
+        </li>
       </ul>
     </el-card>
     <div class="personInfo p-10 w-3/4">
