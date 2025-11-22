@@ -668,7 +668,8 @@ export default {
       const text = typeof payload.text === 'string' ? payload.text : ''
       answer.content = html
       const plainText = text || html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ')
-      answer.completed = !!(plainText && plainText.trim());
+      const hasImage = typeof html === 'string' && /<img[\s\S]*?>/i.test(html)
+      answer.completed = hasImage || !!(plainText && plainText.trim());
     },
     // 格式化日期为时分秒
     formatSeconds(remainTime) {

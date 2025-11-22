@@ -68,19 +68,59 @@
               </div>
               <div class="answer-row">
                 <span class="label">你的答案</span>
-                <span class="value" v-if="question.questionType===1">{{
+                <template v-if="question.questionType===3">
+                  <div v-if="paperAnswerDto.questionAnswerDtos[question.itemOrder].content"
+                      class="value rich-answer">
+                    <div class="rich-answer-wrapper"
+                         :class="{'is-collapsed': shouldCollapseAnswer(question.itemOrder)}">
+                      <div
+                          class="rich-answer-content"
+                          :ref="'answer-' + question.itemOrder"
+                          v-html="paperAnswerDto.questionAnswerDtos[question.itemOrder].content">
+                      </div>
+                    </div>
+                    <div v-if="shouldShowAnswerToggle(question.itemOrder)" class="rich-answer-toggle">
+                      <button
+                          type="button"
+                          class="answer-toggle-btn"
+                          @click="toggleAnswerCollapse(question.itemOrder)">
+                        {{ isAnswerExpanded(question.itemOrder) ? '收起' : '展开全部' }}
+                      </button>
+                    </div>
+                  </div>
+                  <span class="value empty-answer" v-else>未作答</span>
+                </template>
+                <span class="value" v-else-if="question.questionType===1 || question.questionType===4">{{
                     paperAnswerDto.questionAnswerDtos[question.itemOrder].content
                   }}</span>
                 <span class="value" v-else>{{
-                    paperAnswerDto.questionAnswerDtos[question.itemOrder].contentArray
+                    (paperAnswerDto.questionAnswerDtos[question.itemOrder].contentArray || []).join(', ')
                   }}</span>
               </div>
               <div class="answer-row">
                 <span class="label">结果</span>
-                <el-tag type="success" size="mini"
-                        v-if="paperAnswerDto.questionAnswerDtos[question.itemOrder].correct">正确
-                </el-tag>
-                <el-tag type="danger" size="mini" v-else>错误</el-tag>
+                <template v-if="question.questionType===3">
+                  <el-tag
+                      size="mini"
+                      :type="getSubjectiveStatusTag(question).type">
+                    {{ getSubjectiveStatusTag(question).text }}
+                  </el-tag>
+                </template>
+                <template v-else>
+                  <el-tag type="success" size="mini"
+                          v-if="paperAnswerDto.questionAnswerDtos[question.itemOrder].correct">正确
+                  </el-tag>
+                  <el-tag type="danger" size="mini" v-else>错误</el-tag>
+                </template>
+              </div>
+              <div class="answer-row" v-if="question.questionType===3">
+                <span class="label">得分</span>
+                <span class="value score-value">{{ getSubjectiveScoreText(question) }}</span>
+              </div>
+              <div class="answer-row" v-if="question.questionType===3">
+                <span class="label">评语</span>
+                <span class="value comment-value" v-if="getSubjectiveComment(question)">{{ getSubjectiveComment(question) }}</span>
+                <span class="value comment-empty" v-else>老师暂未填写评语</span>
               </div>
               <div class="action-row">
                 <el-button
@@ -135,6 +175,7 @@ import {formatSeconds} from "@/utils/time";
 import ai from "@/components/ai.vue";
 import ElImageViewer from "element-ui/packages/image/src/image-viewer";
 import {addFavorite, getFavoriteList, removeFavorite} from "@/api/questionFavorite";
+import { getOssSign } from "@/api/common";
 
 export default {
   name: "index",
@@ -198,7 +239,11 @@ export default {
       activeQuestionOrder: null,
       scrollListener: null,
       paperAnswerId: null,
-      favoriteMap: {}
+      favoriteMap: {},
+      ossUrlCache: {},
+      answerOverflow: {},
+      answerExpanded: {},
+      answerCollapseHeight: 280
     }
   },
 
@@ -208,8 +253,11 @@ export default {
       this.paperDto = res.data.paperDto
       this.paperAnswerDto = res.data.paperAnswerDto
       this.expandedAnalysis = {}
+      this.answerOverflow = {}
+      this.answerExpanded = {}
       this.$nextTick(() => {
         this.bindAllAnalysisImages()
+        this.bindAllAnswerImages()
         this.setupScrollSpy()
       })
     },
@@ -272,17 +320,218 @@ export default {
         type.questionDtos.forEach(q => this.bindAnalysisImages(q.itemOrder))
       })
     },
-    bindAnalysisImages(itemOrder) {
-      const ref = this.$refs[`analysis-${itemOrder}`]
-      const container = Array.isArray(ref) ? ref[0] : ref
+    bindAllAnswerImages() {
+      if (!this.paperDto?.paperQuestionTypeDto) return
+      this.paperDto.paperQuestionTypeDto.forEach(type => {
+        type.questionDtos.forEach(q => this.bindAnswerImages(q.itemOrder))
+      })
+    },
+    async bindAnalysisImages(itemOrder) {
+      await this.bindRichContentImages(`analysis-${itemOrder}`)
+    },
+    async bindAnswerImages(itemOrder) {
+      await this.bindRichContentImages(`answer-${itemOrder}`)
+      this.scheduleAnswerCollapseCheck(itemOrder)
+    },
+    async bindRichContentImages(refKey) {
+      const container = this.getRefElement(this.$refs[refKey])
       if (!container) return
       const imgs = container.querySelectorAll('img')
       if (!imgs.length) return
-      const urlList = Array.from(imgs).map(img => img.src)
-      imgs.forEach((img, index) => {
-        img.style.cursor = 'zoom-in'
-        img.onclick = () => this.openImagePreview(urlList, index)
+      const imgArray = Array.from(imgs)
+      const signedUrls = await Promise.all(imgArray.map(img => this.prepareRichImageNode(img)))
+      this.attachImagePreview(imgArray, signedUrls)
+    },
+    getRefElement(ref) {
+      if (!ref) return null
+      return Array.isArray(ref) ? ref[0] : ref
+    },
+    attachImagePreview(imgArray, signedUrls) {
+      const previewUrls = []
+      imgArray.forEach((img, index) => {
+        const url = signedUrls[index]
+        if (url) {
+          img.style.cursor = 'zoom-in'
+          const previewIndex = previewUrls.push(url) - 1
+          img.onclick = () => this.openImagePreview(previewUrls, previewIndex)
+        } else {
+          img.style.cursor = 'not-allowed'
+        }
       })
+    },
+    async prepareRichImageNode(img) {
+      const raw = img.getAttribute('data-src') || img.getAttribute('src') || img.src
+      const finalUrl = await this.getDisplayImageUrl(raw)
+      if (finalUrl) {
+        img.setAttribute('src', finalUrl)
+        this.bindImageLoadForCollapse(img)
+      }
+      return finalUrl
+    },
+    bindImageLoadForCollapse(img) {
+      if (!img) return
+      const refKey = this.findAnswerRefKeyByImg(img)
+      if (!refKey) return
+      const itemOrder = Number(refKey.replace('answer-', ''))
+      if (!Number.isFinite(itemOrder)) return
+      const handler = () => {
+        this.updateAnswerCollapseState(itemOrder)
+        img.removeEventListener('load', handler)
+      }
+      img.addEventListener('load', handler)
+    },
+    findAnswerRefKeyByImg(img) {
+      if (!img || !this.$refs) return ''
+      const entries = Object.entries(this.$refs).filter(([key]) => key.startsWith('answer-'))
+      for (const [key, ref] of entries) {
+        const el = this.getRefElement(ref)
+        if (el && el.contains(img)) {
+          return key
+        }
+      }
+      return ''
+    },
+    updateAnswerCollapseState(itemOrder) {
+      const container = this.getRefElement(this.$refs[`answer-${itemOrder}`])
+      if (!container) {
+        this.$delete(this.answerOverflow, itemOrder)
+        return
+      }
+      const maxHeight = this.answerCollapseHeight
+      const isOverflow = container.scrollHeight > maxHeight + 5
+      this.$set(this.answerOverflow, itemOrder, isOverflow)
+    },
+    scheduleAnswerCollapseCheck(itemOrder) {
+      this.$nextTick(() => {
+        this.updateAnswerCollapseState(itemOrder)
+        setTimeout(() => this.updateAnswerCollapseState(itemOrder), 200)
+      })
+    },
+    shouldShowAnswerToggle(itemOrder) {
+      return !!this.answerOverflow[itemOrder]
+    },
+    isAnswerExpanded(itemOrder) {
+      return !!this.answerExpanded[itemOrder]
+    },
+    shouldCollapseAnswer(itemOrder) {
+      return this.shouldShowAnswerToggle(itemOrder) && !this.isAnswerExpanded(itemOrder)
+    },
+    toggleAnswerCollapse(itemOrder) {
+      this.$set(this.answerExpanded, itemOrder, !this.isAnswerExpanded(itemOrder))
+    },
+    getAnswerByOrder(itemOrder) {
+      if (!this.paperAnswerDto || !this.paperAnswerDto.questionAnswerDtos) {
+        return {}
+      }
+      return this.paperAnswerDto.questionAnswerDtos[itemOrder] || {}
+    },
+    getSubjectiveStatusTag(question) {
+      const answer = this.getAnswerByOrder(question.itemOrder)
+      const status = Number(answer.reviewStatus)
+      if (status === 2) {
+        return { text: '已批改', type: 'success' }
+      }
+      if (status === 1) {
+        return { text: '待批改', type: 'warning' }
+      }
+      return { text: '未批改', type: 'info' }
+    },
+    getSubjectiveScoreText(question) {
+      const answer = this.getAnswerByOrder(question.itemOrder)
+      const totalScore = this.parseScore(answer.questionScore != null ? answer.questionScore : question.score)
+      const finalScore = this.parseScore(answer.finalScore)
+      if (finalScore != null) {
+        if (totalScore != null) {
+          return `${finalScore}/${totalScore} 分`
+        }
+        return `${finalScore} 分`
+      }
+      if (Number(answer.reviewStatus) === 1) {
+        return '待老师批改'
+      }
+      return totalScore != null ? `0/${totalScore} 分` : '尚未评分'
+    },
+    parseScore(value) {
+      if (value === null || value === undefined || value === '') {
+        return null
+      }
+      const num = Number(value)
+      return Number.isFinite(num) ? num : null
+    },
+    getSubjectiveComment(question) {
+      const answer = this.getAnswerByOrder(question.itemOrder)
+      return (answer.reviewComment || '').trim()
+    },
+    async getDisplayImageUrl(rawSrc) {
+      const parsed = this.parseImageSource(rawSrc)
+      if (!parsed) {
+        return ''
+      }
+      if (parsed.url) {
+        return parsed.url
+      }
+      if (!parsed.ossKey) {
+        return ''
+      }
+      const now = Date.now()
+      const cache = this.ossUrlCache[parsed.ossKey]
+      if (cache && cache.expireAt > now) {
+        return cache.url
+      }
+      try {
+        const res = await getOssSign({ objectName: parsed.ossKey })
+        const url = res.url || (res.data && res.data.url) || ''
+        if (!url) {
+          return ''
+        }
+        const expireSeconds = res.expireSeconds || (res.data && res.data.expireSeconds) || 300
+        this.ossUrlCache[parsed.ossKey] = {
+          url,
+          expireAt: now + expireSeconds * 1000 - 5000
+        }
+        return url
+      } catch (error) {
+        return ''
+      }
+    },
+    parseImageSource(src) {
+      if (!src) {
+        return null
+      }
+      const value = src.trim()
+      if (!value) {
+        return null
+      }
+      if (/^https?:\/\//i.test(value) || value.startsWith('data:')) {
+        return { url: value }
+      }
+      const base = (process.env.VUE_APP_BASE_API || '').replace(/\/$/, '')
+      let normalized = value
+      if (base && normalized.startsWith(base)) {
+        normalized = normalized.slice(base.length)
+      }
+      normalized = normalized.replace(/^\/+/, '')
+      if (!normalized) {
+        return null
+      }
+      const localPrefixes = ['upload/', 'profile/']
+      if (localPrefixes.some(prefix => normalized.startsWith(prefix))) {
+        return { url: this.joinBaseUrl(`/${normalized}`) }
+      }
+      return { ossKey: normalized }
+    },
+    joinBaseUrl(path) {
+      const base = process.env.VUE_APP_BASE_API || ''
+      if (!base) {
+        return path
+      }
+      if (base.endsWith('/') && path.startsWith('/')) {
+        return `${base}${path.slice(1)}`
+      }
+      if (!base.endsWith('/') && !path.startsWith('/')) {
+        return `${base}/${path}`
+      }
+      return `${base}${path}`
     },
     openImagePreview(urls, index) {
       this.imagePreview.urls = urls
@@ -608,15 +857,33 @@ export default {
 <style scoped>
 .answer-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 6px;
 }
 .answer-row .label {
   width: 80px;
   color: #666;
+  font-weight: 500;
+  padding-top: 6px;
 }
 .answer-row .value {
   color: #333;
+}
+.answer-row .score-value {
+  font-weight: 600;
+  color: #111827;
+}
+.answer-row .comment-value {
+  white-space: pre-wrap;
+  color: #374151;
+  line-height: 1.6;
+}
+.answer-row .comment-empty {
+  color: #9ca3af;
+  font-style: italic;
+}
+.answer-row .empty-answer {
+  color: #9ca3af;
 }
 .analysis-wrap {
   margin-top: 12px;
@@ -641,6 +908,68 @@ export default {
 }
 .analysis-empty {
   color: #999;
+}
+.rich-answer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rich-answer-wrapper {
+  position: relative;
+  width: 100%;
+  border: 1px solid #e5e8ef;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #fbfcff 0%, #f5f7ff 100%);
+  padding: 16px;
+  box-shadow: 0 8px 20px rgba(15, 34, 58, 0.06);
+  overflow: hidden;
+}
+.rich-answer-wrapper.is-collapsed .rich-answer-content {
+  max-height: 280px;
+  overflow: hidden;
+}
+.rich-answer-wrapper.is-collapsed::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 80px;
+  background: linear-gradient(180deg, rgba(251, 252, 255, 0) 0%, rgba(251, 252, 255, 0.9) 80%, #fbfcff 100%);
+  pointer-events: none;
+}
+.rich-answer-content {
+  color: #2f3540;
+  line-height: 1.7;
+  word-break: break-word;
+}
+.rich-answer-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  margin: 12px auto 0;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+  cursor: zoom-in;
+}
+.rich-answer-toggle {
+  display: flex;
+  justify-content: center;
+}
+.answer-toggle-btn {
+  border: none;
+  background: transparent;
+  color: #3b82f6;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.answer-toggle-btn:hover {
+  background: rgba(59, 130, 246, 0.08);
+  color: #1d4ed8;
 }
 .action-row {
   margin-top: 10px;

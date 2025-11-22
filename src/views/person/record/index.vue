@@ -55,9 +55,9 @@
           </ul>
           <ul class="mr-8">
             <li><p class="leading-8">总分: {{ paperAnswer.paperScore }}</p></li>
-            <li><p class="leading-8">得分: {{ scoreText(paperAnswer) }}</p></li>
-            <li v-if="paperAnswer.objectiveScore != null"><p class="leading-8">客观题: {{ paperAnswer.objectiveScore }}</p></li>
-            <li><p class="leading-8">正确题数: {{ paperAnswer.correctCount }}</p></li>
+            <li><p class="leading-8">总得分: {{ scoreText(paperAnswer) }}</p></li>
+            <li v-if="paperAnswer.objectiveScore != null"><p class="leading-8">客观题得分: {{ paperAnswer.objectiveScore }}</p></li>
+            <li><p class="leading-8">客观题正确题数: {{ paperAnswer.correctCount }}</p></li>
           </ul>
           <ul>
             <li><p class="leading-8">耗时: {{ formatSeconds(paperAnswer.doTime) }}</p></li>
