@@ -847,6 +847,12 @@ export default {
 
     async getPaperById(paperId) {
       this.formData = (await getPaper(paperId)).data
+      const windowStatus = this.checkPaperWindow(this.formData)
+      if (windowStatus.status !== 'open') {
+        this.$message.warning(windowStatus.tip)
+        this.$router.replace({path: '/home'})
+        return
+      }
       // 后端下发试卷时若带有开关字段，则以其为准
       if (Object.prototype.hasOwnProperty.call(this.formData, 'enableAntiCheat')) {
         this.antiCheatEnabled = !!this.formData.enableAntiCheat
@@ -856,6 +862,44 @@ export default {
       this.initRemainTime()
       // 时间开始倒计时
       this.timeReduce()
+    },
+    checkPaperWindow(paper = {}) {
+      const {start, end} = this.getPaperTimeRange(paper)
+      const now = Date.now()
+      if (start && now < start) {
+        return {
+          status: 'not_started',
+          tip: `考试未开始，开始时间：${this.formatDateTime(start)}`
+        }
+      }
+      if (end && now > end) {
+        return {
+          status: 'closed',
+          tip: `考试已截止，截止时间：${this.formatDateTime(end)}`
+        }
+      }
+      return { status: 'open', tip: '' }
+    },
+    getPaperTimeRange(paper = {}) {
+      const start = this.parseDate(
+          paper.startTime || paper.beginTime || paper.openTime || paper.publishTime)
+      const end = this.parseDate(
+          paper.endTime || paper.closeTime || paper.deadlineTime || paper.deadline)
+      return { start, end }
+    },
+    parseDate(value) {
+      if (!value) return null
+      const ts = Date.parse(value)
+      if (!Number.isNaN(ts)) return ts
+      const normalized = String(value).replace(/-/g, '/')
+      const ts2 = Date.parse(normalized)
+      return Number.isNaN(ts2) ? null : ts2
+    },
+    formatDateTime(ts) {
+      if (!ts) return ''
+      const date = new Date(ts)
+      const pad = n => String(n).padStart(2, '0')
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
     },
     //提交试卷弹框确认信息
     submit() {
