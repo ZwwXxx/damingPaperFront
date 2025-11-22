@@ -273,76 +273,8 @@ export default {
     goToRegister() {
       this.$message.info('注册功能开发中...')
       // TODO: 跳转到注册页面或打开注册对话框
-    }
-  },
-  
-  mounted() {
-    // 初始化粒子连线效果
-    this.initParticleCanvas()
+    },
     
-    // 添加鼠标移动监听
-    this.handleMouseMove = (e) => {
-      const shapes = document.querySelectorAll('.floating-shape')
-      const particles = document.querySelectorAll('.particle')
-      const mouseX = e.clientX
-      const mouseY = e.clientY
-      const centerX = window.innerWidth / 2
-      const centerY = window.innerHeight / 2
-      
-      // 几何图形跟随鼠标（反向移动，营造视差效果）
-      shapes.forEach((shape, index) => {
-        const speed = (index + 1) * 0.05
-        const x = (mouseX - centerX) * speed
-        const y = (mouseY - centerY) * speed
-        shape.style.transform = `translate(${-x}px, ${-y}px)`
-      })
-      
-      // 粒子跟随鼠标（正向移动，更快速）
-      particles.forEach((particle, index) => {
-        const speed = (index + 1) * 0.1
-        const x = (mouseX - centerX) * speed
-        const y = (mouseY - centerY) * speed
-        const scale = 1 + Math.abs(speed) * 0.5
-        particle.style.transform = `translate(${x}px, ${y}px) scale(${scale})`
-      })
-    }
-    
-    // 添加鼠标点击波纹效果
-    this.handleClick = (e) => {
-      const ripple = document.createElement('div')
-      ripple.className = 'click-ripple'
-      ripple.style.left = e.clientX + 'px'
-      ripple.style.top = e.clientY + 'px'
-      document.querySelector('.login-container').appendChild(ripple)
-      
-      setTimeout(() => {
-        ripple.remove()
-      }, 1000)
-    }
-    
-    window.addEventListener('mousemove', this.handleMouseMove)
-    window.addEventListener('click', this.handleClick)
-    
-    // 添加卡片3D倾斜效果
-    const card = document.querySelector('.login-card')
-    card.addEventListener('mousemove', (e) => {
-      const rect = card.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
-      const centerX = rect.width / 2
-      const centerY = rect.height / 2
-      const rotateX = (y - centerY) / 20
-      const rotateY = (centerX - x) / 20
-      
-      card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`
-    })
-    
-    card.addEventListener('mouseleave', () => {
-      card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)'
-    })
-  },
-  
-  methods: {
     // 粒子连线效果
     initParticleCanvas() {
       const canvas = document.getElementById('particleCanvas')
@@ -398,8 +330,27 @@ export default {
         canvas.width = window.innerWidth
         canvas.height = window.innerHeight
       })
-    },
+    }
+  },
   
+  mounted() {
+    // 初始化粒子连线效果
+    this.initParticleCanvas()
+    
+    // 添加鼠标点击波纹效果
+    this.handleClick = (e) => {
+      const ripple = document.createElement('div')
+      ripple.className = 'click-ripple'
+      ripple.style.left = e.clientX + 'px'
+      ripple.style.top = e.clientY + 'px'
+      document.querySelector('.login-container').appendChild(ripple)
+      
+      setTimeout(() => {
+        ripple.remove()
+      }, 1000)
+    }
+    
+    window.addEventListener('click', this.handleClick)
   },
   
   beforeDestroy() {
@@ -408,9 +359,6 @@ export default {
       clearInterval(this.timer)
     }
     // 移除事件监听
-    if (this.handleMouseMove) {
-      window.removeEventListener('mousemove', this.handleMouseMove)
-    }
     if (this.handleClick) {
       window.removeEventListener('click', this.handleClick)
     }
@@ -512,15 +460,7 @@ export default {
   border: 2px solid rgba(26, 200, 154, 0.15);
   background: rgba(26, 200, 154, 0.03);
   backdrop-filter: blur(5px);
-  transition: transform 0.3s ease-out;
   pointer-events: none;
-  animation: gentleRotate 20s linear infinite;
-}
-
-/* 几何图形微旋转 */
-@keyframes gentleRotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }
 
 .shape-1 {
@@ -529,6 +469,7 @@ export default {
   border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
   top: 10%;
   left: 8%;
+  animation: float1 18s ease-in-out infinite;
 }
 
 .shape-2 {
@@ -537,6 +478,7 @@ export default {
   border-radius: 50%;
   top: 60%;
   left: 15%;
+  animation: float2 15s ease-in-out infinite;
 }
 
 .shape-3 {
@@ -545,6 +487,7 @@ export default {
   border-radius: 20px;
   top: 20%;
   right: 12%;
+  animation: float3 20s ease-in-out infinite;
 }
 
 .shape-4 {
@@ -553,6 +496,7 @@ export default {
   border-radius: 50% 0;
   bottom: 15%;
   right: 20%;
+  animation: float4 16s ease-in-out infinite;
 }
 
 .shape-5 {
@@ -561,6 +505,7 @@ export default {
   clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
   bottom: 25%;
   left: 25%;
+  animation: float5 14s ease-in-out infinite;
 }
 
 /* 粒子光点 */
@@ -571,7 +516,6 @@ export default {
   border-radius: 50%;
   background: rgba(26, 200, 154, 0.8);
   box-shadow: 0 0 15px rgba(26, 200, 154, 1);
-  transition: all 0.15s ease-out;
   pointer-events: none;
   opacity: 0.8;
   animation: particlePulse 3s ease-in-out infinite;
@@ -584,8 +528,8 @@ export default {
     box-shadow: 0 0 15px rgba(26, 200, 154, 1);
   }
   50% {
-    transform: scale(1.5);
-    box-shadow: 0 0 25px rgba(26, 200, 154, 1);
+    transform: scale(2);
+    box-shadow: 0 0 30px rgba(26, 200, 154, 1);
   }
 }
 
@@ -598,34 +542,34 @@ export default {
 .particle-7 { top: 35%; left: 50%; animation-delay: 2.4s; }
 .particle-8 { top: 65%; left: 60%; animation-delay: 2.8s; }
 
-/* 浮动动画 */
+/* 浮动动画 - 增大幅度 */
 @keyframes float1 {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  33% { transform: translate(30px, -20px) rotate(120deg); }
-  66% { transform: translate(-20px, 30px) rotate(240deg); }
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  33% { transform: translate(60px, -40px) rotate(120deg) scale(1.1); }
+  66% { transform: translate(-40px, 60px) rotate(240deg) scale(0.9); }
 }
 
 @keyframes float2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-40px, 40px) scale(1.2); }
+  0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  50% { transform: translate(-80px, 80px) scale(1.3) rotate(180deg); }
 }
 
 @keyframes float3 {
-  0%, 100% { transform: translate(0, 0) rotate(45deg); }
-  33% { transform: translate(-25px, 35px) rotate(135deg); }
-  66% { transform: translate(35px, -25px) rotate(225deg); }
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  33% { transform: translate(-50px, 70px) rotate(120deg) scale(1.15); }
+  66% { transform: translate(70px, -50px) rotate(240deg) scale(0.85); }
 }
 
 @keyframes float4 {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  50% { transform: translate(30px, -30px) rotate(180deg); }
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate(60px, -60px) rotate(180deg) scale(1.2); }
 }
 
 @keyframes float5 {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  25% { transform: translate(20px, 20px) rotate(90deg); }
-  50% { transform: translate(-20px, 20px) rotate(180deg); }
-  75% { transform: translate(-20px, -20px) rotate(270deg); }
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  25% { transform: translate(50px, 50px) rotate(90deg) scale(1.1); }
+  50% { transform: translate(-50px, 50px) rotate(180deg) scale(0.9); }
+  75% { transform: translate(-50px, -50px) rotate(270deg) scale(1.1); }
 }
 
 /* 闪烁动画 */
@@ -675,8 +619,6 @@ export default {
   overflow: hidden;
   position: relative;
   animation: slideUp 0.6s ease-out, breathe 4s ease-in-out infinite;
-  transition: transform 0.3s ease-out;
-  transform-style: preserve-3d;
 }
 
 /* 呼吸发光动画 */
