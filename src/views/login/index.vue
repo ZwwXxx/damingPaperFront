@@ -197,6 +197,69 @@
         </div>
       </div>
     </div>
+
+    <!-- 注册对话框 -->
+    <el-dialog
+      title="用户注册"
+      :visible.sync="registerDialogVisible"
+      width="450px"
+      :close-on-click-modal="false"
+      class="register-dialog">
+      <el-form 
+        ref="registerForm" 
+        :model="registerForm" 
+        :rules="registerRules"
+        label-width="80px">
+        <el-form-item label="用户名" prop="userName">
+          <el-input 
+            v-model="registerForm.userName" 
+            placeholder="请输入用户名（4-16位字母数字）"
+            prefix-icon="el-icon-user"
+            maxlength="16"
+            class="harmony-input">
+          </el-input>
+        </el-form-item>
+        
+        <el-form-item label="昵称" prop="nickName">
+          <el-input 
+            v-model="registerForm.nickName" 
+            placeholder="请输入昵称"
+            prefix-icon="el-icon-star-off"
+            maxlength="20"
+            class="harmony-input">
+          </el-input>
+        </el-form-item>
+        
+        <el-form-item label="密码" prop="password">
+          <el-input 
+            v-model="registerForm.password" 
+            type="password"
+            placeholder="请输入密码（6-20位）"
+            prefix-icon="el-icon-lock"
+            show-password
+            maxlength="20"
+            class="harmony-input">
+          </el-input>
+        </el-form-item>
+        
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input 
+            v-model="registerForm.confirmPassword" 
+            type="password"
+            placeholder="请再次输入密码"
+            prefix-icon="el-icon-lock"
+            show-password
+            maxlength="20"
+            class="harmony-input">
+          </el-input>
+        </el-form-item>
+      </el-form>
+      
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="registerDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleRegister" :loading="registerLoading">注册</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -235,7 +298,46 @@ export default {
       // 微信扫码状态: waiting-待扫码, scanned-已扫码, success-登录成功
       wxScanStatus: 'waiting',
       // 登录成功后要跳转的页面（从query获取）
-      redirectUrl: ''
+      redirectUrl: '',
+      
+      // ========== 注册相关 ==========
+      // 注册对话框显示
+      registerDialogVisible: false,
+      // 注册加载状态
+      registerLoading: false,
+      // 注册表单数据
+      registerForm: {
+        userName: '',
+        nickName: '',
+        password: '',
+        confirmPassword: ''
+      },
+      // 注册表单验证规则
+      registerRules: {
+        userName: [
+          { required: true, message: '请输入用户名', trigger: 'blur' },
+          { min: 4, max: 16, message: '用户名长度为4-16位', trigger: 'blur' },
+          { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名只能包含字母、数字和下划线', trigger: 'blur' }
+        ],
+        nickName: [
+          { required: true, message: '请输入昵称', trigger: 'blur' },
+          { min: 2, max: 20, message: '昵称长度为2-20位', trigger: 'blur' }
+        ],
+        password: [
+          { required: true, message: '请输入密码', trigger: 'blur' },
+          { min: 6, max: 20, message: '密码长度为6-20位', trigger: 'blur' }
+        ],
+        confirmPassword: [
+          { required: true, message: '请再次输入密码', trigger: 'blur' },
+          { validator: (rule, value, callback) => {
+            if (value !== this.registerForm.password) {
+              callback(new Error('两次输入的密码不一致'))
+            } else {
+              callback()
+            }
+          }, trigger: 'blur' }
+        ]
+      }
     }
   },
   computed: {
@@ -272,11 +374,16 @@ export default {
       
       if (res.code === 200) {
         this.$message.success("登录成功")
+        console.log('[Login] 登录响应:', res)
+        console.log('[Login] Token:', res.token)
+        
         setToken(res.token)
         this.$store.commit("SET_TOKEN", res.token)
         
         // 获取用户信息
-        await this.$store.dispatch('GetInfo')
+        console.log('[Login] 开始获取用户信息...')
+        const infoRes = await this.$store.dispatch('GetInfo')
+        console.log('[Login] 获取用户信息结果:', infoRes)
         
         this.$router.push({path:'/'})
       } else {
@@ -323,10 +430,57 @@ export default {
       }, 1000)
     },
     
-    // 跳转到注册页面
+    // 打开注册对话框
     goToRegister() {
-      this.$message.info('注册功能开发中...')
-      // TODO: 跳转到注册页面或打开注册对话框
+      this.registerDialogVisible = true
+      // 重置表单
+      this.registerForm = {
+        userName: '',
+        nickName: '',
+        password: '',
+        confirmPassword: ''
+      }
+      // 清除验证
+      this.$nextTick(() => {
+        if (this.$refs.registerForm) {
+          this.$refs.registerForm.clearValidate()
+        }
+      })
+    },
+    
+    // 处理注册
+    async handleRegister() {
+      try {
+        // 表单验证
+        await this.$refs.registerForm.validate()
+        
+        this.registerLoading = true
+        
+        // 调用注册接口
+        const res = await registry({
+          userName: this.registerForm.userName,
+          nickName: this.registerForm.nickName,
+          password: this.registerForm.password
+        })
+        
+        if (res.code === 200) {
+          this.$message.success('注册成功！请登录')
+          this.registerDialogVisible = false
+          
+          // 自动填充用户名到登录表单
+          this.formData.userName = this.registerForm.userName
+          this.activeTab = 'password' // 切换到密码登录
+        } else {
+          this.$message.error(res.msg || '注册失败')
+        }
+      } catch (error) {
+        if (error !== false) { // 非表单验证错误
+          console.error('注册失败:', error)
+          this.$message.error('注册失败，请稍后重试')
+        }
+      } finally {
+        this.registerLoading = false
+      }
     },
     
     // ========== 微信扫码登录相关方法 ==========
@@ -1495,5 +1649,118 @@ export default {
     width: 90%;
     max-width: 800px;
   }
+}
+
+/* ========== 注册对话框样式 ========== */
+.register-dialog >>> .el-dialog {
+  background: linear-gradient(135deg, rgba(15, 15, 15, 0.98) 0%, rgba(10, 10, 10, 0.98) 100%);
+  border: 1px solid rgba(26, 200, 154, 0.2);
+  border-radius: 16px;
+  box-shadow: 
+    0 8px 32px rgba(26, 200, 154, 0.25),
+    0 0 60px rgba(26, 200, 154, 0.15);
+  backdrop-filter: blur(20px);
+}
+
+.register-dialog >>> .el-dialog__header {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid rgba(26, 200, 154, 0.1);
+}
+
+.register-dialog >>> .el-dialog__title {
+  color: #1ac89a;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.register-dialog >>> .el-dialog__headerbtn .el-dialog__close {
+  color: rgba(34, 230, 168, 0.6);
+  font-size: 20px;
+  transition: all 0.3s ease;
+}
+
+.register-dialog >>> .el-dialog__headerbtn .el-dialog__close:hover {
+  color: #1ac89a;
+  transform: rotate(90deg);
+}
+
+.register-dialog >>> .el-dialog__body {
+  padding: 24px;
+}
+
+.register-dialog >>> .el-form-item {
+  margin-bottom: 30px;
+  position: relative;
+}
+
+.register-dialog >>> .el-form-item__label {
+  color: rgba(34, 230, 168, 0.85);
+  font-weight: 500;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.register-dialog >>> .el-form-item__error {
+  color: #ff6b9d;
+  font-size: 12px;
+  position: absolute;
+  bottom: -22px;
+  left: 2px;
+  line-height: 1;
+}
+
+.register-dialog >>> .el-dialog__footer {
+  padding: 16px 24px 24px;
+  border-top: 1px solid rgba(26, 200, 154, 0.1);
+}
+
+.register-dialog >>> .dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.register-dialog >>> .el-button {
+  height: 42px;
+  padding: 0 28px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.register-dialog >>> .el-button--default {
+  background: rgba(26, 200, 154, 0.1);
+  border: 1px solid rgba(26, 200, 154, 0.2);
+  color: #1ac89a;
+}
+
+.register-dialog >>> .el-button--default:hover {
+  background: rgba(26, 200, 154, 0.15);
+  border-color: #1ac89a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(26, 200, 154, 0.2);
+}
+
+.register-dialog >>> .el-button--primary {
+  background: linear-gradient(135deg, #1ac89a 0%, #15a878 100%);
+  border: none;
+  color: #0a0a0a;
+  font-weight: 600;
+  box-shadow: 
+    0 4px 12px rgba(26, 200, 154, 0.3),
+    0 0 20px rgba(26, 200, 154, 0.2);
+}
+
+.register-dialog >>> .el-button--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 6px 20px rgba(26, 200, 154, 0.4),
+    0 0 30px rgba(26, 200, 154, 0.3);
+}
+
+.register-dialog >>> .el-button--primary.is-loading {
+  opacity: 0.8;
 }
 </style>

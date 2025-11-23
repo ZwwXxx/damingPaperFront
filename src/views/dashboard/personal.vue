@@ -93,7 +93,7 @@
         </el-card>
       </el-col>
     </el-row>
-
+<!-- 
     <el-row :gutter="20">
       <el-col :xs="24" :sm="24" :md="24" :lg="24">
         <el-card class="chart-card">
@@ -103,7 +103,7 @@
           <div id="wrongTypeChart" style="width: 100%; height: 350px"></div>
         </el-card>
       </el-col>
-    </el-row>
+    </el-row> -->
 
     <!-- 学习时间分布 -->
     <el-row :gutter="20">
@@ -351,6 +351,8 @@ export default {
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           borderColor: '#409EFF',
           borderWidth: 1,
+          confine: false,
+          appendToBody: true,
           textStyle: {
             color: '#333'
           },
@@ -401,7 +403,7 @@ export default {
           }
         },
         grid: {
-          left: '3%',
+          left: '50px',
           right: '4%',
           bottom: '18%',
           top: '5%',
@@ -418,6 +420,12 @@ export default {
         yAxis: {
           type: 'value',
           name: '得分率(%)',
+          nameLocation: 'middle',
+          nameGap: 35,
+          nameTextStyle: {
+            fontSize: 12,
+            fontWeight: 'bold'
+          },
           max: 100,
           min: 0
         },
@@ -462,6 +470,8 @@ export default {
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           borderColor: '#67C23A',
           borderWidth: 1,
+          confine: false,
+          appendToBody: true,
           textStyle: {
             color: '#333',
             fontSize: 13
@@ -530,6 +540,8 @@ export default {
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           borderColor: '#E6A23C',
           borderWidth: 1,
+          confine: false,
+          appendToBody: true,
           textStyle: {
             color: '#333',
             fontSize: 13
@@ -593,6 +605,8 @@ export default {
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           borderColor: '#409EFF',
           borderWidth: 1,
+          confine: false,
+          appendToBody: true,
           textStyle: {
             color: '#333',
             fontSize: 13

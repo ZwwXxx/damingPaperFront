@@ -79,6 +79,21 @@ const routes = [
                 path: '/feedback/my',
                 name: 'feedbackMy',
                 component: () => import('@/views/feedback/my.vue'),
+            },
+            {
+                path: '/forum/index',
+                name: 'forumIndex',
+                component: () => import('@/views/forum/index.vue'),
+            },
+            {
+                path: '/forum/detail/:id',
+                name: 'forumDetail',
+                component: () => import('@/views/forum/detail.vue'),
+            },
+            {
+                path: '/forum/post',
+                name: 'forumPost',
+                component: () => import('@/views/forum/post.vue'),
             }
 
         ],

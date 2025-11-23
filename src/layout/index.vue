@@ -7,6 +7,7 @@
         <div class="text-white text-lg font-semibold cursor-pointer" @click="goToUrl('/home')">Daming Paper</div>
         <div class="hidden md:flex space-x-4 items-center">
           <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white px-3 py-2">首页</a>
+          <a href="#" @click="goToUrl('/forum/index')" class="block text-gray-300 hover:text-white px-3 py-2">论坛</a>
           <a href="#" @click="goToUrl('/notice/list')" class="block text-gray-300 hover:text-white px-3 py-2">公告</a>
           <a href="#" @click="goToUrl('/feedback/submit')" class="block text-gray-300 hover:text-white px-3 py-2">反馈</a>
           <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white px-3 py-2">AI</a>
@@ -48,6 +49,7 @@
           <el-button type="primary" size="mini" @click="goToUrl('/person/info')">进入</el-button>
         </div>
         <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white p-4">首页</a>
+        <a href="#" @click="goToUrl('/forum/index')" class="block text-gray-300 hover:text-white p-4">论坛</a>
         <a href="#" @click="goToUrl('/notice/list')" class="block text-gray-300 hover:text-white p-4">公告</a>
         <a href="#" @click="goToUrl('/feedback/submit')" class="block text-gray-300 hover:text-white p-4">反馈</a>
         <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white p-4">AI</a>
@@ -110,7 +112,12 @@ export default {
         type: 'warning'
       }).then(() => {
         this.$store.dispatch('LogOut').then(() => {
-          location.href = '/';
+          this.$message.success('退出成功')
+          // 退出后跳转到登录页
+          this.$router.push('/login')
+        }).catch(() => {
+          // 即使退出失败，也跳转到登录页
+          this.$router.push('/login')
         })
       }).catch(() => {
       });
