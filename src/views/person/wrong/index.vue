@@ -72,12 +72,12 @@
             <span class="text-green-600 font-semibold">{{ formatCorrectAnswer(item) }}</span>
           </p>
         </div>
-        <div class="checkButton">
+        <!-- <div class="checkButton">
           <button
               @click="gotoReview(item.latestAnswerId || item.answerId)"
               class="bg-blue-500 absolute right-4 bottom-4 px-4 py-2 text-white rounded">查看试卷
           </button>
-        </div>
+        </div> -->
       </div>
       <el-empty v-if="!loading && !wrongList.length" description="暂时没有错题记录"/>
     </div>

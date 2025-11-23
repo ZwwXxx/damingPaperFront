@@ -47,6 +47,11 @@ const routes = [
                         path: 'favorite',
                         name: 'favorite',
                         component: () => import('@/views/person/favorite/index.vue'),
+                    },
+                    {
+                        path: 'dashboard',
+                        name: 'dashboard',
+                        component: () => import('@/views/dashboard/personal.vue'),
                     }
                 ]
             },
