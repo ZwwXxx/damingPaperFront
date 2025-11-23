@@ -64,8 +64,22 @@ const routes = [
                 path: '/ai',
                 name: 'ai',
                 component: () => import('@/components/ai.vue'),
+            },
+            {
+                path: '/notice/list',
+                name: 'noticeList',
+                component: () => import('@/views/notice/list.vue'),
+            },
+            {
+                path: '/feedback/submit',
+                name: 'feedbackSubmit',
+                component: () => import('@/views/feedback/submit.vue'),
+            },
+            {
+                path: '/feedback/my',
+                name: 'feedbackMy',
+                component: () => import('@/views/feedback/my.vue'),
             }
-
 
         ],
     },

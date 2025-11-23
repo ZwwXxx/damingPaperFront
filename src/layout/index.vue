@@ -7,6 +7,8 @@
         <div class="text-white text-lg font-semibold cursor-pointer" @click="goToUrl('/home')">Daming Paper</div>
         <div class="hidden md:flex space-x-4 items-center">
           <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white px-3 py-2">首页</a>
+          <a href="#" @click="goToUrl('/notice/list')" class="block text-gray-300 hover:text-white px-3 py-2">公告</a>
+          <a href="#" @click="goToUrl('/feedback/submit')" class="block text-gray-300 hover:text-white px-3 py-2">反馈</a>
           <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white px-3 py-2">AI</a>
           <el-dropdown trigger="hover" @command="handleUserCommand">
             <span class="avatar-wrapper block px-3 py-2 cursor-pointer text-gray-300 hover:text-white">
@@ -15,6 +17,7 @@
             </span>
             <el-dropdown-menu slot="dropdown">
               <el-dropdown-item command="profile">个人中心</el-dropdown-item>
+              <el-dropdown-item command="feedback">我的反馈</el-dropdown-item>
               <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
@@ -45,8 +48,8 @@
           <el-button type="primary" size="mini" @click="goToUrl('/person/info')">进入</el-button>
         </div>
         <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white p-4">首页</a>
-        <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white p-4">关于</a>
-        <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white p-4">服务</a>
+        <a href="#" @click="goToUrl('/notice/list')" class="block text-gray-300 hover:text-white p-4">公告</a>
+        <a href="#" @click="goToUrl('/feedback/submit')" class="block text-gray-300 hover:text-white p-4">反馈</a>
         <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white p-4">AI</a>
         <div class="p-4 border-t border-gray-700">
           <el-button type="danger" size="small" class="w-full" @click="logout">退出登录</el-button>
@@ -115,6 +118,8 @@ export default {
     handleUserCommand(command) {
       if (command === 'profile') {
         this.goToUrl('/person/info');
+      } else if (command === 'feedback') {
+        this.goToUrl('/feedback/my');
       } else if (command === 'logout') {
         this.logout();
       }

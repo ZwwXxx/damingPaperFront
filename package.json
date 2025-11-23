@@ -33,6 +33,7 @@
     "marked-highlight": "^2.2.0",
     "moment": "^2.30.1",
     "prismjs": "^1.29.0",
+    "qrcode": "^1.5.4",
     "quill": "^1.3.7",
     "vue": "^2.6.14",
     "vue-cropper": "^0.6.5",

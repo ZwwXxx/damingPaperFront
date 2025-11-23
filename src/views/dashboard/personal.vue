@@ -83,7 +83,7 @@
 
     <!-- 错题统计 -->
     <el-row :gutter="20">
-      <el-col :xs="24" :sm="24" :md="12" :lg="12">
+      <el-col :xs="24" :sm="24" :md="24" :lg="24">
         <el-card class="chart-card">
           <div slot="header" class="card-header">
             <span>❌ 错题科目分布</span>
@@ -92,8 +92,10 @@
           <div id="wrongSubjectChart" style="width: 100%; height: 350px"></div>
         </el-card>
       </el-col>
+    </el-row>
 
-      <el-col :xs="24" :sm="24" :md="12" :lg="12">
+    <el-row :gutter="20">
+      <el-col :xs="24" :sm="24" :md="24" :lg="24">
         <el-card class="chart-card">
           <div slot="header" class="card-header">
             <span>📝 错题题型分布</span>
@@ -344,8 +346,16 @@ export default {
       const option = {
         tooltip: {
           trigger: 'axis',
+          z: 9999,
+          padding: 12,
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          borderColor: '#409EFF',
+          borderWidth: 1,
+          textStyle: {
+            color: '#333'
+          },
           formatter: (params) => {
-            let result = `<div style="padding: 5px">`
+            let result = `<div style="padding: 8px; min-width: 200px;">`
             params.forEach(item => {
               if (item.value !== null) {
                 const paperData = paperSeriesData.find(p => p.paperName === item.seriesName)
@@ -354,12 +364,16 @@ export default {
                   const date = new Date(record.createTime)
                   const dateStr = date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
                   result += `
-                    <div style="margin-bottom: 5px">
-                      <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${item.color};margin-right:5px"></span>
-                      <strong>${item.seriesName}</strong><br/>
-                      <span style="margin-left: 15px">得分率: ${item.value}%</span><br/>
-                      <span style="margin-left: 15px">得分: ${record.finalScore}/${record.paperScore}</span><br/>
-                      <span style="margin-left: 15px">时间: ${dateStr}</span>
+                    <div style="margin-bottom: 8px; padding: 6px 0; border-bottom: 1px solid #eee;">
+                      <div style="margin-bottom: 6px;">
+                        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${item.color};margin-right:8px;vertical-align:middle;"></span>
+                        <strong style="font-size: 14px;">${item.seriesName}</strong>
+                      </div>
+                      <div style="margin-left: 18px; line-height: 22px;">
+                        <div>得分率: <strong style="color: ${item.color};">${item.value}%</strong></div>
+                        <div>得分: ${record.finalScore}/${record.paperScore}</div>
+                        <div style="color: #999; font-size: 12px;">时间: ${dateStr}</div>
+                      </div>
                     </div>
                   `
                 }
@@ -442,7 +456,16 @@ export default {
       const option = {
         tooltip: {
           trigger: 'item',
-          formatter: '{b}: {c}题 ({d}%)'
+          formatter: '{b}: {c}题 ({d}%)',
+          z: 9999,
+          padding: 12,
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          borderColor: '#67C23A',
+          borderWidth: 1,
+          textStyle: {
+            color: '#333',
+            fontSize: 13
+          }
         },
         legend: {
           orient: 'vertical',
@@ -501,6 +524,15 @@ export default {
           trigger: 'axis',
           axisPointer: {
             type: 'shadow'
+          },
+          z: 9999,
+          padding: 12,
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          borderColor: '#E6A23C',
+          borderWidth: 1,
+          textStyle: {
+            color: '#333',
+            fontSize: 13
           }
         },
         grid: {
@@ -556,8 +588,20 @@ export default {
       const option = {
         tooltip: {
           trigger: 'axis',
+          z: 9999,
+          padding: 12,
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          borderColor: '#409EFF',
+          borderWidth: 1,
+          textStyle: {
+            color: '#333',
+            fontSize: 13
+          },
           formatter: (params) => {
-            return `${params[0].name}:00 - ${params[0].name}:59<br/>活动次数: ${params[0].value}`
+            return `<div style="line-height: 22px;">
+              <div style="font-weight: bold; margin-bottom: 4px;">${params[0].name}:00 - ${params[0].name}:59</div>
+              <div>活动次数: <strong style="color: #409EFF;">${params[0].value}</strong></div>
+            </div>`
           }
         },
         grid: {

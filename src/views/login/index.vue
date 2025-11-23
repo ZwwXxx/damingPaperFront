@@ -45,13 +45,50 @@
           
           <!-- 二维码区域 -->
           <div class="qr-code-box">
-            <div class="qr-loading">
+            <!-- 加载中 -->
+            <div v-if="!qrcodeUrl && !wxLoginError" class="qr-loading">
               <i class="el-icon-loading"></i>
-              <p>二维码加载中...</p>
+              <p>二维码生成中...</p>
+            </div>
+            
+            <!-- 二维码显示（整个区域可点击刷新） -->
+            <div v-show="qrcodeUrl" 
+                 class="qr-code-container" 
+                 :class="{ 'refreshing': wxScanStatus === 'refreshing' }"
+                 @click="refreshQrcode">
+              <canvas ref="qrcodeCanvas"></canvas>
+              
+              <!-- hover时显示刷新遮罩 -->
+              <div v-if="wxScanStatus !== 'scanned'" class="qr-refresh-overlay">
+                <i class="el-icon-refresh-right"></i>
+                <p>点击刷新</p>
+              </div>
+              
+              <!-- 扫码成功遮罩 -->
+              <div v-if="wxScanStatus === 'scanned'" class="qr-scanned-overlay">
+                <i class="el-icon-success"></i>
+                <p>已扫码，请在手机上确认授权</p>
+              </div>
+            </div>
+            
+            <!-- 错误提示 -->
+            <div v-if="wxLoginError" class="qr-error">
+              <i class="el-icon-warning"></i>
+              <p>{{ wxLoginError }}</p>
+              <el-button size="mini" type="primary" @click="retryQrcode">重新获取</el-button>
             </div>
           </div>
           
-          <p class="qr-hint">打开微信扫描二维码</p>
+          <p class="qr-hint">
+            <span v-if="wxScanStatus === 'refreshing'" class="refresh-tip">
+              <i class="el-icon-loading"></i>
+              正在刷新二维码...
+            </span>
+            <span v-else-if="wxScanStatus === 'scanned'">
+              <!-- 扫码成功提示已在遮罩层显示 -->
+            </span>
+            <span v-else>打开微信扫描二维码 / 点击二维码可刷新</span>
+          </p>
         </div>
       </div>
 
@@ -166,6 +203,7 @@
 <script>
 import { login, registry} from "@/api/user";
 import {setToken} from "@/utils/auth";
+import QRCode from 'qrcode'
 
 export default {
   name: "index",
@@ -185,7 +223,19 @@ export default {
       // 验证码倒计时
       countdown: 0,
       // 倒计时定时器
-      timer: null
+      timer: null,
+      
+      // ========== 微信扫码登录相关 ==========
+      // WebSocket连接
+      websocket: null,
+      // 二维码URL
+      qrcodeUrl: '',
+      // 微信登录错误信息
+      wxLoginError: '',
+      // 微信扫码状态: waiting-待扫码, scanned-已扫码, success-登录成功
+      wxScanStatus: 'waiting',
+      // 登录成功后要跳转的页面（从query获取）
+      redirectUrl: ''
     }
   },
   computed: {
@@ -216,7 +266,7 @@ export default {
       }
       
       const res = await login({
-        userName: this.formData.userName,
+        username: this.formData.userName,  // 后端LoginBody字段是username（小写）
         password: this.formData.password
       })
       
@@ -224,6 +274,10 @@ export default {
         this.$message.success("登录成功")
         setToken(res.token)
         this.$store.commit("SET_TOKEN", res.token)
+        
+        // 获取用户信息
+        await this.$store.dispatch('GetInfo')
+        
         this.$router.push({path:'/'})
       } else {
         this.$message.error(res.msg || "登录失败")
@@ -273,6 +327,219 @@ export default {
     goToRegister() {
       this.$message.info('注册功能开发中...')
       // TODO: 跳转到注册页面或打开注册对话框
+    },
+    
+    // ========== 微信扫码登录相关方法 ==========
+    /**
+     * 初始化微信登录
+     */
+    initWxLogin() {
+      try {
+        // ⭐ 开发环境使用相对路径，会经过代理；生产环境使用绝对路径
+        const isDev = process.env.NODE_ENV === 'development'
+        const wsUrl = isDev 
+          ? `ws://${window.location.host}/ws/login`  // 开发环境：通过代理
+          : (process.env.VUE_APP_WS_URL || 'ws://127.0.0.1:8080/ws/login')  // 生产环境：直连
+        
+        console.log('WebSocket连接地址:', wsUrl)
+        this.websocket = new WebSocket(wsUrl)
+        
+        this.websocket.onopen = () => {
+          console.log('WebSocket连接成功')
+          this.wxLoginError = ''
+          // 请求二维码，如果有redirect则携带
+          this.requestQrcode()
+        }
+        
+        this.websocket.onmessage = (event) => {
+          this.handleWxMessage(event.data)
+        }
+        
+        this.websocket.onerror = (error) => {
+          console.error('WebSocket错误:', error)
+          this.wxLoginError = 'WebSocket连接失败，请检查网络'
+        }
+        
+        this.websocket.onclose = () => {
+          console.log('WebSocket连接关闭')
+        }
+      } catch (error) {
+        console.error('初始化WebSocket失败:', error)
+        this.wxLoginError = '初始化失败，请刷新页面重试'
+      }
+    },
+    
+    /**
+     * 请求二维码
+     */
+    requestQrcode() {
+      if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        // 如果有redirect参数，则携带发送给后端
+        if (this.redirectUrl) {
+          console.log('请求二维码 - 携带redirect:', this.redirectUrl)
+          this.websocket.send('request_qrcode:' + this.redirectUrl)
+        } else {
+          console.log('请求二维码 - 不携帧redirect')
+          this.websocket.send('request_qrcode')
+        }
+      } else {
+        this.wxLoginError = 'WebSocket未连接，请刷新页面'
+      }
+    },
+    
+    /**
+     * 处理WebSocket消息
+     */
+    handleWxMessage(message) {
+      console.log('收到消息:', message)
+      
+      // 错误消息
+      if (message.startsWith('ERROR:')) {
+        this.wxLoginError = message.substring(6)
+        return
+      }
+      
+      // 扫码状态通知
+      if (message === 'SCANNED') {
+        this.wxScanStatus = 'scanned'
+        this.$message.success('检测到扫码，请在手机上确认授权')
+        return
+      }
+      
+      // 登录成功
+      if (message.startsWith('SUCCESS:')) {
+        const token = message.substring(8)
+        this.handleWxLoginSuccess(token)
+        return
+      }
+      
+      // 默认认为是二维码URL
+      this.qrcodeUrl = message
+      this.wxScanStatus = 'waiting'
+      this.generateQrcode(message)
+    },
+    
+    /**
+     * 生成二维码
+     */
+    async generateQrcode(url) {
+      try {
+        await this.$nextTick()
+        if (this.$refs.qrcodeCanvas) {
+          await QRCode.toCanvas(this.$refs.qrcodeCanvas, url, {
+            width: 200,
+            margin: 2,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF'
+            }
+          })
+          console.log('二维码生成成功')
+        }
+      } catch (error) {
+        console.error('生成二维码失败:', error)
+        this.wxLoginError = '生成二维码失败'
+      }
+    },
+    
+    /**
+     * 处理微信登录成功
+     */
+    async handleWxLoginSuccess(token) {
+      console.log('微信登录成功 - token:', token)
+      
+      this.wxScanStatus = 'success'
+      this.$message.success('✅ 微信扫码登录成功！正在跳转...')
+      
+      // 保存token
+      setToken(token)
+      this.$store.commit('SET_TOKEN', token)
+      
+      // 关闭WebSocket
+      this.closeWebSocket()
+      
+      try {
+        // 获取用户信息（路由守卫需要）
+        console.log('正在获取用户信息...')
+        const res = await this.$store.dispatch('GetInfo')
+        
+        if (res.code === 200) {
+          console.log('✅ 用户信息获取成功:', res.user)
+          
+          // 延迟跳转
+          setTimeout(() => {
+            if (this.redirectUrl) {
+              console.log('重定向到:', this.redirectUrl)
+              this.$router.push(this.redirectUrl)
+            } else {
+              console.log('跳转到首页')
+              this.$router.push('/')
+            }
+          }, 500)
+        } else {
+          console.error('❌ 获取用户信息失败:', res)
+          this.$message.error('获取用户信息失败，请重新登录')
+        }
+      } catch (error) {
+        console.error('❌ 获取用户信息异常:', error)
+        this.$message.error('登录失败，请重试')
+      }
+    },
+    
+    /**
+     * 关闭WebSocket
+     */
+    closeWebSocket() {
+      if (this.websocket) {
+        this.websocket.close()
+        this.websocket = null
+      }
+    },
+    
+    /**
+     * 刷新二维码（点击二维码时调用）
+     */
+    refreshQrcode() {
+      // 防止频繁点击
+      if (this.wxScanStatus === 'refreshing') {
+        return
+      }
+      
+      console.log('刷新二维码...')
+      this.$message.info('正在刷新二维码...')
+      
+      this.qrcodeUrl = ''
+      this.wxScanStatus = 'refreshing'
+      
+      // 清空canvas
+      const canvas = this.$refs.qrcodeCanvas
+      if (canvas) {
+        const ctx = canvas.getContext('2d')
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+      }
+      
+      if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        // WebSocket连接正常，直接请求新二维码
+        this.requestQrcode()
+      } else {
+        // WebSocket断开，重新建立连接
+        this.initWxLogin()
+      }
+    },
+    
+    /**
+     * 重新获取二维码（错误重试时调用）
+     */
+    retryQrcode() {
+      this.qrcodeUrl = ''
+      this.wxLoginError = ''
+      this.wxScanStatus = 'waiting'
+      
+      if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        this.requestQrcode()
+      } else {
+        this.initWxLogin()
+      }
     },
     
     // 粒子连线效果
@@ -334,8 +601,15 @@ export default {
   },
   
   mounted() {
+    // 获取redirect参数
+    this.redirectUrl = this.$route.query.redirect || ''
+    console.log('登录页挂载 - redirect:', this.redirectUrl)
+    
     // 初始化粒子连线效果
     this.initParticleCanvas()
+    
+    // ⭐ 初始化WebSocket并请求二维码
+    this.initWxLogin()
     
     // 添加鼠标点击波纹效果
     this.handleClick = (e) => {
@@ -362,6 +636,8 @@ export default {
     if (this.handleClick) {
       window.removeEventListener('click', this.handleClick)
     }
+    // ⭐ 关闭WebSocket连接
+    this.closeWebSocket()
   }
 }
 </script>
@@ -691,9 +967,9 @@ export default {
 }
 
 .icon-wrapper {
-  width: 80px;
-  height: 80px;
-  margin: 16px auto 24px;
+  width: 60px;
+  height: 60px;
+  margin: 16px auto 16px;
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(10px);
   border-radius: 24px;
@@ -719,7 +995,7 @@ export default {
 .qr-desc {
   font-size: 13px;
   opacity: 0.9;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
   line-height: 1.5;
   white-space: nowrap;
 }
@@ -756,10 +1032,187 @@ export default {
   color: #666;
 }
 
+/* 二维码错误提示 */
+.qr-error {
+  text-align: center;
+  color: #F56C6C;
+  padding: 20px;
+}
+
+.qr-error i {
+  font-size: 36px;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.qr-error p {
+  font-size: 13px;
+  margin-bottom: 15px;
+  color: #666;
+}
+
+/* 二维码容器（可点击） */
+.qr-code-container {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: 0 auto;
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.qr-code-container:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(26, 200, 154, 0.3);
+}
+
+/* 刷新中时禁用hover效果 */
+.qr-code-container.refreshing {
+  cursor: not-allowed;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.qr-code-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 刷新遮罩层（hover时显示） */
+.qr-refresh-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  color: white;
+}
+
+.qr-code-container:hover .qr-refresh-overlay {
+  opacity: 1;
+}
+
+.qr-refresh-overlay i {
+  font-size: 32px;
+  margin-bottom: 8px;
+  animation: rotate-refresh 2s linear infinite;
+}
+
+.qr-refresh-overlay p {
+  font-size: 14px;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* 刷新图标旋转动画 */
+@keyframes rotate-refresh {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 扫码成功遮罩层（黑色半透明） */
+.qr-scanned-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  animation: fadeIn 0.3s ease;
+}
+
+.qr-scanned-overlay i {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: #67C23A;
+  animation: scaleIn 0.5s ease;
+}
+
+.qr-scanned-overlay p {
+  font-size: 13px;
+  margin: 0;
+  font-weight: 400;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* 遮罩淡入动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 图标缩放动画 */
+@keyframes scaleIn {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
 .qr-hint {
   font-size: 12px;
   opacity: 0.8;
   margin-top: 4px;
+}
+
+/* 扫码成功提示 */
+.scan-tip {
+  color: #67C23A;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.scan-tip i {
+  font-size: 14px;
+}
+
+/* 刷新中提示 */
+.refresh-tip {
+  color: #409EFF;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.refresh-tip i {
+  font-size: 14px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 /* 右侧表单区域 */
