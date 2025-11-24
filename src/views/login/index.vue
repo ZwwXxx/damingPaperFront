@@ -553,17 +553,19 @@ export default {
         return
       }
       
-      // 扫码状态通知
-      if (message === 'SCANNED') {
-        this.wxScanStatus = 'scanned'
-        this.$message.success('检测到扫码，请在手机上确认授权')
+      // ⭐⭐⭐ 登录成功：收到token，直接登录（base模式）
+      if (message.startsWith('SUCCESS:')) {
+        const token = message.substring(8)
+        console.log('✅ 收到token，自动登录')
+        this.$message.success('扫码成功，正在登录...')
+        this.handleWxLoginSuccess(token)
         return
       }
       
-      // 登录成功
-      if (message.startsWith('SUCCESS:')) {
-        const token = message.substring(8)
-        this.handleWxLoginSuccess(token)
+      // 扫码状态通知（userinfo模式）
+      if (message === 'SCANNED') {
+        this.wxScanStatus = 'scanned'
+        this.$message.success('检测到扫码，请在手机上确认授权')
         return
       }
       
