@@ -63,7 +63,7 @@
             <div class="reviewInfo  p-6 flex flex-col text-sm">
               <div class="answer-row">
                 <span class="label">标准答案</span>
-                <span class="value" v-if="question.questionType===1">{{ question.correct }}</span>
+                <span class="value" v-if="question.questionType===1 || question.questionType===4 || question.questionType===5">{{ question.correct }}</span>
                 <span class="value" v-else>{{ question.correctArray }}</span>
               </div>
               <div class="answer-row">
@@ -90,7 +90,7 @@
                   </div>
                   <span class="value empty-answer" v-else>未作答</span>
                 </template>
-                <span class="value" v-else-if="question.questionType===1 || question.questionType===4">{{
+                <span class="value" v-else-if="question.questionType===1 || question.questionType===4 || question.questionType===5">{{
                     paperAnswerDto.questionAnswerDtos[question.itemOrder].content
                   }}</span>
                 <span class="value" v-else>{{

@@ -102,7 +102,16 @@
                 :min-height="220"
                 :placeholder="'请输入答案（可插入图片、富文本）'"
                 v-model="answer.questionAnswerDtos[questionItem.itemOrder].content"
-                @on-change="handleTextChange(questionItem.itemOrder, $event)"/>
+                @change="updateCompletedStatus(questionItem.itemOrder)"
+            />
+            <el-input
+                v-if="questionItem.questionType===5"
+                v-model="answer.questionAnswerDtos[questionItem.itemOrder].content"
+                type="textarea"
+                :rows="3"
+                placeholder="请输入填空题答案"
+                @change="updateCompletedStatus(questionItem.itemOrder)"
+            />
           </div>
         </div>
       </div>
@@ -164,7 +173,16 @@
                 :min-height="220"
                 :placeholder="'请输入答案（可插入图片、富文本）'"
                 v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content"
-                @on-change="handleTextChange(currentQuestion.itemOrder, $event)"/>
+                @change="updateCompletedStatus(currentQuestion.itemOrder)"
+            />
+            <el-input
+                v-if="currentQuestion.questionType===5"
+                v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content"
+                type="textarea"
+                :rows="3"
+                placeholder="请输入填空题答案"
+                @change="updateCompletedStatus(currentQuestion.itemOrder)"
+            />
           </div>
         </div>
         <div class="question-navigation flex justify-between items-center p-4">
@@ -285,7 +303,8 @@ export default {
         1: '单选题',
         2: '多选题',
         3: '主观题',
-        4: '判断题'
+        4: '判断题',
+        5: '填空题'
       }
     }
   },
