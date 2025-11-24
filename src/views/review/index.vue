@@ -21,7 +21,7 @@
             <el-tag
                 @click="jumpTo(question.itemOrder)"
                 v-for="(question, qIndex) in questionType.questionDtos" :key="qIndex"
-                :type="paperAnswerDto.questionAnswerDtos[question.itemOrder].correct?'success':'danger'"
+                :type="getQuestionTagType(question)"
                 style="padding: 0; display: flex; justify-content: center; width:  calc(20% - 10px); height: 30px;margin: 5px"
                 class="cursor-pointer"
                 :class="{'tag-active': activeQuestionOrder === question.itemOrder}">
@@ -41,10 +41,10 @@
             </div>
             <div class="q-options p-6 flex flex-col ">
               <el-radio-group
-                  v-if="question.questionType===1"
+                  v-if="question.questionType===1 && answerMap[question.itemOrder]"
                   v-removeAria
-                  v-model="paperAnswerDto.questionAnswerDtos[question.itemOrder].content"
-                  @change="paperAnswerDto.questionAnswerDtos[question.itemOrder].completed = true">
+                  v-model="answerMap[question.itemOrder].content"
+                  @change="answerMap[question.itemOrder].completed = true">
                 <el-radio
                     disabled
                     class="py-2" :label="selection.prefix"
@@ -53,8 +53,8 @@
 
                 </el-radio>
               </el-radio-group>
-              <el-checkbox-group v-model="paperAnswerDto.questionAnswerDtos[question.itemOrder].contentArray"
-                                 v-if="question.questionType===2">
+              <el-checkbox-group v-model="answerMap[question.itemOrder].contentArray"
+                                 v-if="question.questionType===2 && answerMap[question.itemOrder]">
                 <el-checkbox disabled v-for="(checkBox,index) in question.items" :label="checkBox.prefix" :key="index">
                   {{ checkBox.prefix }}
                 </el-checkbox>
@@ -69,14 +69,14 @@
               <div class="answer-row">
                 <span class="label">你的答案</span>
                 <template v-if="question.questionType===3">
-                  <div v-if="paperAnswerDto.questionAnswerDtos[question.itemOrder].content"
+                  <div v-if="answerMap[question.itemOrder] && answerMap[question.itemOrder].content"
                       class="value rich-answer">
                     <div class="rich-answer-wrapper"
                          :class="{'is-collapsed': shouldCollapseAnswer(question.itemOrder)}">
                       <div
                           class="rich-answer-content"
                           :ref="'answer-' + question.itemOrder"
-                          v-html="paperAnswerDto.questionAnswerDtos[question.itemOrder].content">
+                          v-html="answerMap[question.itemOrder].content">
                       </div>
                     </div>
                     <div v-if="shouldShowAnswerToggle(question.itemOrder)" class="rich-answer-toggle">
@@ -91,10 +91,10 @@
                   <span class="value empty-answer" v-else>未作答</span>
                 </template>
                 <span class="value" v-else-if="question.questionType===1 || question.questionType===4 || question.questionType===5">{{
-                    paperAnswerDto.questionAnswerDtos[question.itemOrder].content
+                    answerMap[question.itemOrder] ? answerMap[question.itemOrder].content : ''
                   }}</span>
                 <span class="value" v-else>{{
-                    (paperAnswerDto.questionAnswerDtos[question.itemOrder].contentArray || []).join(', ')
+                    (answerMap[question.itemOrder] && answerMap[question.itemOrder].contentArray || []).join(', ')
                   }}</span>
               </div>
               <div class="answer-row">
@@ -108,7 +108,7 @@
                 </template>
                 <template v-else>
                   <el-tag type="success" size="mini"
-                          v-if="paperAnswerDto.questionAnswerDtos[question.itemOrder].correct">正确
+                          v-if="answerMap[question.itemOrder] && answerMap[question.itemOrder].correct">正确
                   </el-tag>
                   <el-tag type="danger" size="mini" v-else>错误</el-tag>
                 </template>
@@ -244,6 +244,19 @@ export default {
       answerOverflow: {},
       answerExpanded: {},
       answerCollapseHeight: 280
+    }
+  },
+
+  computed: {
+    // 创建答案映射，通过itemOrder快速查找对应的答案
+    answerMap() {
+      const map = {}
+      if (this.paperAnswerDto && this.paperAnswerDto.questionAnswerDtos) {
+        this.paperAnswerDto.questionAnswerDtos.forEach(answer => {
+          map[answer.itemOrder] = answer
+        })
+      }
+      return map
     }
   },
 
@@ -420,10 +433,29 @@ export default {
       this.$set(this.answerExpanded, itemOrder, !this.isAnswerExpanded(itemOrder))
     },
     getAnswerByOrder(itemOrder) {
-      if (!this.paperAnswerDto || !this.paperAnswerDto.questionAnswerDtos) {
-        return {}
+      return this.answerMap[itemOrder] || {}
+    },
+    // 获取题目标签颜色类型
+    getQuestionTagType(question) {
+      const answer = this.answerMap[question.itemOrder]
+      if (!answer) {
+        return 'info'
       }
-      return this.paperAnswerDto.questionAnswerDtos[itemOrder] || {}
+      
+      // 主观题根据批改状态显示颜色
+      if (question.questionType === 3) {
+        const status = Number(answer.reviewStatus)
+        if (status === 2) {
+          return 'success'  // 已批改-绿色
+        }
+        if (status === 1) {
+          return 'warning'  // 待批改-橙色
+        }
+        return 'info'  // 未批改-灰色
+      }
+      
+      // 其他题型根据对错显示颜色
+      return answer.correct ? 'success' : 'danger'
     },
     getSubjectiveStatusTag(question) {
       const answer = this.getAnswerByOrder(question.itemOrder)
@@ -959,6 +991,23 @@ export default {
 }
 .question-anchor .tag-active {
   box-shadow: 0 0 0 2px #409EFF inset;
+  transform: scale(1.02);
+}
+::v-deep .analysis-content img{
+  max-width: 200px;
+  max-height: 200px;
+}
+/* 限制主观题答案中的图片大小 */
+.rich-answer-content >>> img {
+  max-width: 200px;
+  max-height: 200px;
+  height: auto;
+  width: auto;
+  cursor: zoom-in;
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+.rich-answer-content >>> img:hover {
   transform: scale(1.02);
 }
 ::v-deep .analysis-content ul {

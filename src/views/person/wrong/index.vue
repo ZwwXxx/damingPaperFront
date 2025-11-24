@@ -65,12 +65,26 @@
           </div>
         </div>
         <div class="answers flex flex-col md:flex-row md:space-x-6 text-sm text-gray-700">
-          <p>我的答案：
-            <span class="text-red-500 font-semibold">{{ formatAnswer(item.userAnswer) }}</span>
-          </p>
-          <p>正确答案：
-            <span class="text-green-600 font-semibold">{{ formatCorrectAnswer(item) }}</span>
-          </p>
+          <div class="answer-item">
+            <span class="answer-label">我的答案：</span>
+            <div 
+              v-if="isRichTextAnswer(item.userAnswer)"
+              class="rich-answer text-red-500 font-semibold"
+              v-html="item.userAnswer"
+              @click="handleAnswerImageClick($event, item.userAnswer)">
+            </div>
+            <span v-else class="text-red-500 font-semibold">{{ formatAnswer(item.userAnswer) }}</span>
+          </div>
+          <div class="answer-item">
+            <span class="answer-label">正确答案：</span>
+            <div 
+              v-if="isRichTextAnswer(item.correct)"
+              class="rich-answer text-green-600 font-semibold"
+              v-html="item.correct"
+              @click="handleAnswerImageClick($event, item.correct)">
+            </div>
+            <span v-else class="text-green-600 font-semibold">{{ formatCorrectAnswer(item) }}</span>
+          </div>
         </div>
         <!-- <div class="checkButton">
           <button
@@ -81,15 +95,27 @@
       </div>
       <el-empty v-if="!loading && !wrongList.length" description="暂时没有错题记录"/>
     </div>
+    
+    <!-- 图片预览 -->
+    <el-image-viewer
+      v-if="imagePreview.visible"
+      :url-list="imagePreview.urls"
+      :initial-index="imagePreview.index"
+      :on-close="closeImagePreview"
+    />
   </div>
 </template>
 
 <script>
 import {getWrongQuestionList} from "@/api/questionAnswer";
 import {optionSubject} from "@/api/subject";
+import ElImageViewer from "element-ui/packages/image/src/image-viewer";
 
 export default {
   name: "wrongRecord",
+  components: {
+    ElImageViewer
+  },
   data() {
     return {
       wrongList: [],
@@ -104,6 +130,11 @@ export default {
       },
       queryParam: {
         createUser: this.$store.getters['id']
+      },
+      imagePreview: {
+        visible: false,
+        urls: [],
+        index: 0
       }
     }
   },
@@ -198,6 +229,40 @@ export default {
         return item.correctArray.join('、')
       }
       return item.correct || '-'
+    },
+    // 判断是否为富文本答案（包含HTML标签）
+    isRichTextAnswer(answer) {
+      if (!answer || typeof answer !== 'string') return false
+      return /<[^>]+>/g.test(answer)
+    },
+    // 处理答案中的图片点击
+    handleAnswerImageClick(event, htmlContent) {
+      const target = event.target
+      if (target && target.tagName === 'IMG') {
+        event.preventDefault()
+        const tempDiv = document.createElement('div')
+        tempDiv.innerHTML = htmlContent
+        const images = Array.from(tempDiv.querySelectorAll('img'))
+        const urls = images.map(img => img.getAttribute('src')).filter(Boolean)
+        if (urls.length > 0) {
+          const index = Math.max(images.findIndex(img => img.getAttribute('src') === target.getAttribute('src')), 0)
+          this.openImagePreview(urls, index)
+        }
+      }
+    },
+    // 打开图片预览
+    openImagePreview(urls, index) {
+      this.imagePreview = {
+        visible: true,
+        urls: urls,
+        index: index
+      }
+    },
+    // 关闭图片预览
+    closeImagePreview() {
+      this.imagePreview.visible = false
+      this.imagePreview.urls = []
+      this.imagePreview.index = 0
     }
   }
 }
@@ -230,6 +295,42 @@ export default {
   border-top-right-radius: 999px;
   border-bottom-right-radius: 999px;
   border: 1px solid #dc2626;
+}
+
+/* 答案富文本样式 */
+.answer-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.answer-label {
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+.rich-answer {
+  flex: 1;
+}
+
+/* 限制富文本答案中的图片大小 */
+.rich-answer >>> img {
+  max-width: 200px;
+  max-height: 200px;
+  height: auto;
+  width: auto;
+  cursor: zoom-in;
+  display: inline-block;
+  transition: transform 0.2s ease;
+  margin: 4px 0;
+}
+
+.rich-answer >>> img:hover {
+  transform: scale(1.05);
+}
+
+.rich-answer >>> p {
+  margin: 4px 0;
 }
 </style>
 

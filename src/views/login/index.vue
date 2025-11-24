@@ -273,7 +273,7 @@ export default {
   data() {
     return {
       // 当前激活的tab：password-密码登录, code-验证码登录
-      activeTab: 'code',
+      activeTab: 'password',
       // 表单数据
       formData: {
         userName: '',
