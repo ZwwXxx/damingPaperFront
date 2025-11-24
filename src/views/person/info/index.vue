@@ -62,8 +62,8 @@ export default {
     return {
       // 是否显示cropper
       form: {
-        userName:this.$store.state.user.id,
-        nickName:this.$store.state.user.name,
+        userName: this.$store.state.user.userName || '',  // 登录名（zww）
+        nickName: this.$store.state.user.nickName || '',   // 显示名（6666）
       },
       rules: {
         nickName: [{required: true, message: '请输入昵称', trigger: 'blur'}]
@@ -85,14 +85,14 @@ export default {
         await store.dispatch('GetInfo')
         
         // 更新表单数据
-        this.form.userName = store.getters.id
-        this.form.nickName = store.getters.name
+        this.form.userName = store.getters.userName  // 登录名（zww）
+        this.form.nickName = store.getters.nickName  // 显示名（6666）
         
-        // 获取头像URL（已经在store中转换为签名URL）
+        // 获取头像URL（后端已返回完整的CDN地址）
         const avatarUrl = store.getters.avatar
         console.log('加载的头像URL:', avatarUrl)
         
-        if (avatarUrl) {
+        if (avatarUrl && avatarUrl !== DEFAULT_AVATAR) {
           this.options.img = avatarUrl
         } else {
           // 没有头像时使用默认头像
@@ -152,7 +152,7 @@ export default {
           
           const uploadRes = await uploadFile(formData)
           if (uploadRes.code === 200) {
-            avatarUrl = uploadRes.url  // OSS返回的URL
+            avatarUrl = uploadRes.url  // 使用url字段获取完整CDN地址
             console.log('头像上传成功:', avatarUrl)
           } else {
             this.$message.error('头像上传失败')

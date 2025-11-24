@@ -25,37 +25,18 @@
             />
           </el-form-item>
 
-          <!-- 帖子内容 -->
+          <!-- 帖子内容（富文本编辑器） -->
           <el-form-item label="内容" prop="content">
-            <el-input
+            <rich-text-editor
               v-model="formData.content"
-              type="textarea"
-              :rows="12"
-              placeholder="请输入帖子内容（支持换行）"
-              maxlength="5000"
-              show-word-limit
-              class="content-input"
+              :min-height="300"
+              :placeholder="'请输入帖子内容（支持富文本、插入图片）'"
+              class="content-editor"
             />
-          </el-form-item>
-
-          <!-- 图片上传 -->
-          <el-form-item label="图片">
-            <el-upload
-              action="#"
-              list-type="picture-card"
-              :file-list="fileList"
-              :on-preview="handlePreview"
-              :on-remove="handleRemove"
-              :before-upload="beforeUpload"
-              :http-request="handleUpload"
-              :limit="9"
-              accept="image/*"
-            >
-              <i class="el-icon-plus"></i>
-              <div slot="tip" class="upload-tip">
-                建议上传jpg/png图片，单张不超过5MB，最多9张
-              </div>
-            </el-upload>
+            <div class="editor-tip">
+              <i class="el-icon-info"></i>
+              支持富文本格式、直接插入图片，图片会自动上传到服务器
+            </div>
           </el-form-item>
 
           <!-- 操作按钮 -->
@@ -71,19 +52,18 @@
       </div>
     </div>
 
-    <!-- 图片预览对话框 -->
-    <el-dialog :visible.sync="previewVisible" append-to-body>
-      <img :src="previewImage" style="width: 100%" />
-    </el-dialog>
   </div>
 </template>
 
 <script>
 import { addPost, updatePost, getPostDetail } from '@/api/forum'
-import { uploadFile } from '@/api/user'
+import RichTextEditor from '@/components/RichTextEditor.vue'
 
 export default {
   name: 'ForumPost',
+  components: {
+    RichTextEditor
+  },
   data() {
     return {
       isEdit: false,
@@ -91,8 +71,7 @@ export default {
       submitting: false,
       formData: {
         title: '',
-        content: '',
-        images: []
+        content: ''
       },
       formRules: {
         title: [
@@ -100,13 +79,9 @@ export default {
           { min: 5, max: 100, message: '标题长度为5-100个字符', trigger: 'blur' }
         ],
         content: [
-          { required: true, message: '请输入帖子内容', trigger: 'blur' },
-          { min: 10, max: 5000, message: '内容长度为10-5000个字符', trigger: 'blur' }
+          { required: true, message: '请输入帖子内容', trigger: 'blur' }
         ]
-      },
-      fileList: [],
-      previewVisible: false,
-      previewImage: ''
+      }
     }
   },
   mounted() {
@@ -124,77 +99,13 @@ export default {
         const res = await getPostDetail(this.postId)
         if (res.code === 200) {
           this.formData.title = res.post.title
-          this.formData.content = res.post.content
-          this.formData.images = res.post.images || []
-          
-          // 设置文件列表
-          this.fileList = (res.post.images || []).map((url, index) => ({
-            uid: index,
-            name: `image-${index}`,
-            status: 'success',
-            url: url
-          }))
+          this.formData.content = res.post.content || ''
         }
       } catch (error) {
         console.error('加载帖子数据失败:', error)
         this.$message.error('加载失败')
         this.goBack()
       }
-    },
-
-    // 上传前校验
-    beforeUpload(file) {
-      const isImage = file.type.startsWith('image/')
-      const isLt5M = file.size / 1024 / 1024 < 5
-
-      if (!isImage) {
-        this.$message.error('只能上传图片文件！')
-        return false
-      }
-      if (!isLt5M) {
-        this.$message.error('图片大小不能超过 5MB！')
-        return false
-      }
-      return true
-    },
-
-    // 自定义上传
-    async handleUpload(options) {
-      const { file, onSuccess, onError } = options
-      
-      const formData = new FormData()
-      formData.append('file', file)
-
-      try {
-        const res = await uploadFile(formData)
-        if (res.code === 200) {
-          // 上传成功，添加到图片列表
-          this.formData.images.push(res.url)
-          onSuccess(res)
-          this.$message.success('上传成功')
-        } else {
-          onError(new Error(res.msg || '上传失败'))
-          this.$message.error(res.msg || '上传失败')
-        }
-      } catch (error) {
-        console.error('上传失败:', error)
-        onError(error)
-        this.$message.error('上传失败，请稍后重试')
-      }
-    },
-
-    // 移除图片
-    handleRemove(file) {
-      const index = this.fileList.findIndex(item => item.uid === file.uid)
-      if (index > -1) {
-        this.formData.images.splice(index, 1)
-      }
-    },
-
-    // 预览图片
-    handlePreview(file) {
-      this.previewImage = file.url
-      this.previewVisible = true
     },
 
     // 提交表单
@@ -211,15 +122,13 @@ export default {
             // 编辑帖子
             res = await updatePost(this.postId, {
               title: this.formData.title,
-              content: this.formData.content,
-              images: this.formData.images
+              content: this.formData.content
             })
           } else {
             // 发布新帖
             res = await addPost({
               title: this.formData.title,
-              content: this.formData.content,
-              images: this.formData.images
+              content: this.formData.content
             })
           }
 
@@ -301,44 +210,51 @@ export default {
   box-shadow: 0 0 0 2px rgba(26, 200, 154, 0.1);
 }
 
-/* 内容输入框 */
-.content-input >>> .el-textarea__inner {
-  border-radius: 12px;
+/* 富文本编辑器 */
+.content-editor {
+  width: 100%;
+}
+
+.content-editor >>> .ql-toolbar {
+  border-radius: 12px 12px 0 0;
   border: 1px solid #e0e0e0;
+  background: #fafafa;
+}
+
+.content-editor >>> .ql-container {
+  border-radius: 0 0 12px 12px;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  min-height: 300px;
+}
+
+.content-editor >>> .ql-editor {
+  min-height: 300px;
   font-size: 15px;
   line-height: 1.8;
-  padding: 16px;
-  transition: all 0.3s ease;
 }
 
-.content-input >>> .el-textarea__inner:focus {
+.content-editor >>> .ql-editor:focus {
+  outline: none;
+}
+
+.content-editor:hover >>> .ql-toolbar,
+.content-editor:hover >>> .ql-container {
   border-color: #1ac89a;
-  box-shadow: 0 0 0 2px rgba(26, 200, 154, 0.1);
 }
 
-/* 图片上传 */
-.upload-tip {
+.editor-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
   font-size: 12px;
   color: #999;
-  margin-top: 8px;
 }
 
-.post-form-card >>> .el-upload--picture-card {
-  width: 120px;
-  height: 120px;
-  border-radius: 12px;
-  border: 1px dashed #d9d9d9;
-  transition: all 0.3s ease;
-}
-
-.post-form-card >>> .el-upload--picture-card:hover {
-  border-color: #1ac89a;
-}
-
-.post-form-card >>> .el-upload-list--picture-card .el-upload-list__item {
-  width: 120px;
-  height: 120px;
-  border-radius: 12px;
+.editor-tip i {
+  font-size: 14px;
+  color: #1ac89a;
 }
 
 /* 操作按钮 */
@@ -389,14 +305,8 @@ export default {
     font-size: 20px;
   }
 
-  .post-form-card >>> .el-upload--picture-card {
-    width: 100px;
-    height: 100px;
-  }
-
-  .post-form-card >>> .el-upload-list--picture-card .el-upload-list__item {
-    width: 100px;
-    height: 100px;
+  .content-editor >>> .ql-editor {
+    min-height: 250px;
   }
 }
 </style>

@@ -45,6 +45,14 @@
         </li>
         <li>
           <a
+              @click="swtichContent('/person/posts')"
+              :class="['flex p-3 px-4 rounded-2xl items-baseline cursor-pointer', isActive('/person/posts') ? ' bg-blue-500 text-white' : '']">
+            <i class="fa fa-commenting mr-4"></i>
+            <span>我的帖子</span>
+          </a>
+        </li>
+        <li>
+          <a
               @click="swtichContent('/person/dashboard')"
               :class="['flex p-3 px-4 rounded-2xl items-baseline cursor-pointer', isActive('/person/dashboard') ? ' bg-blue-500 text-white' : '']">
             <i class="fa fa-bar-chart mr-4"></i>

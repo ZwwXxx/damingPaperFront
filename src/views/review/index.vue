@@ -463,36 +463,9 @@ export default {
       return (answer.reviewComment || '').trim()
     },
     async getDisplayImageUrl(rawSrc) {
-      const parsed = this.parseImageSource(rawSrc)
-      if (!parsed) {
-        return ''
-      }
-      if (parsed.url) {
-        return parsed.url
-      }
-      if (!parsed.ossKey) {
-        return ''
-      }
-      const now = Date.now()
-      const cache = this.ossUrlCache[parsed.ossKey]
-      if (cache && cache.expireAt > now) {
-        return cache.url
-      }
-      try {
-        const res = await getOssSign({ objectName: parsed.ossKey })
-        const url = res.url || (res.data && res.data.url) || ''
-        if (!url) {
-          return ''
-        }
-        const expireSeconds = res.expireSeconds || (res.data && res.data.expireSeconds) || 300
-        this.ossUrlCache[parsed.ossKey] = {
-          url,
-          expireAt: now + expireSeconds * 1000 - 5000
-        }
-        return url
-      } catch (error) {
-        return ''
-      }
+      // 超级简化：直接返回原始URL，不做任何处理
+      // 数据库存储的已经是完整CDN地址
+      return rawSrc || ''
     },
     parseImageSource(src) {
       if (!src) {

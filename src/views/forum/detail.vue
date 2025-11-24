@@ -13,7 +13,10 @@
           <div class="user-info">
             <img :src="post.avatar || defaultAvatar" class="user-avatar" />
             <div class="user-details">
-              <span class="user-name">{{ post.nickName || post.userName }}</span>
+              <span class="user-name">
+                {{ post.nickName || post.userName }}
+                <span v-if="isAuthor" class="author-badge">（你）</span>
+              </span>
               <span class="post-time">{{ formatTime(post.createTime) }}</span>
             </div>
           </div>
@@ -28,20 +31,8 @@
         <!-- 帖子标题 -->
         <h1 class="post-title">{{ post.title }}</h1>
 
-        <!-- 帖子内容 -->
-        <div class="post-content" v-html="formatContent(post.content)"></div>
-
-        <!-- 帖子图片 -->
-        <div v-if="post.images && post.images.length > 0" class="post-images">
-          <el-image
-            v-for="(img, index) in post.images"
-            :key="index"
-            :src="img"
-            :preview-src-list="post.images"
-            class="post-image"
-            fit="cover"
-          />
-        </div>
+        <!-- 帖子内容（富文本） -->
+        <div class="post-content ql-editor" v-html="formatContent(post.content)"></div>
 
         <!-- 帖子统计和操作 -->
         <div class="post-footer">
@@ -50,7 +41,7 @@
               <i class="el-icon-view"></i> {{ post.viewCount || 0 }} 浏览
             </span>
             <span class="stat-item">
-              <i class="el-icon-chat-line-round"></i> {{ post.commentCount || 0 }} 评论
+              <i class="el-icon-chat-line-round"></i> {{ totalCommentCount }} 评论
             </span>
           </div>
           
@@ -69,7 +60,7 @@
       <!-- 评论区 -->
       <div class="comments-section">
         <div class="comments-header">
-          <h2>💬 全部评论 ({{ comments.length }})</h2>
+          <h2>💬 全部评论 ({{ totalCommentCount }})</h2>
         </div>
 
         <!-- 发表评论 -->
@@ -98,7 +89,10 @@
             <div class="comment-header">
               <img :src="comment.avatar || defaultAvatar" class="comment-avatar" />
               <div class="comment-user-info">
-                <span class="comment-user-name">{{ comment.nickName || comment.userName }}</span>
+                <span class="comment-user-name">
+                  {{ comment.nickName || comment.userName }}
+                  <span v-if="isCommentAuthor(comment)" class="author-badge">（你）</span>
+                </span>
                 <span class="comment-time">{{ formatTime(comment.createTime) }}</span>
               </div>
             </div>
@@ -132,16 +126,19 @@
             <!-- 子评论 -->
             <div v-if="comment.children && comment.children.length > 0" class="sub-comments">
               <div
-                v-for="reply in comment.children"
+                v-for="reply in getVisibleReplies(comment)"
                 :key="reply.commentId"
                 class="sub-comment-item"
               >
                 <div class="sub-comment-header">
                   <img :src="reply.avatar || defaultAvatar" class="sub-comment-avatar" />
                   <div class="sub-comment-user-info">
-                    <span class="sub-comment-user-name">{{ reply.nickName || reply.userName }}</span>
-                    <span v-if="reply.replyToUserName" class="reply-to">
-                      回复 @{{ reply.replyToUserName }}
+                    <span class="sub-comment-user-name">
+                      {{ reply.nickName || reply.userName }}
+                      <span v-if="isCommentAuthor(reply)" class="author-badge">（你）</span>
+                    </span>
+                    <span v-if="shouldShowReplyTo(reply, comment)" class="reply-to">
+                      回复 @{{ reply.replyToNickName || reply.replyToUserName }}
                     </span>
                   </div>
                 </div>
@@ -155,7 +152,33 @@
                     <i class="el-icon-thumb"></i>
                     {{ reply.likeCount || 0 }}
                   </span>
+                  <span class="comment-reply" @click="handleReply(reply, comment)">
+                    <i class="el-icon-chat-dot-round"></i>
+                    回复
+                  </span>
+                  <span
+                    v-if="isCommentAuthor(reply)"
+                    class="comment-delete"
+                    @click="handleDeleteComment(reply)"
+                  >
+                    <i class="el-icon-delete"></i>
+                    删除
+                  </span>
                 </div>
+              </div>
+              
+              <!-- 展开/收起按钮 -->
+              <div v-if="comment.children.length > 3" class="sub-comments-toggle">
+                <span @click="toggleReplies(comment.commentId)" class="toggle-btn">
+                  <template v-if="expandedComments[comment.commentId]">
+                    <i class="el-icon-arrow-up"></i>
+                    收起回复
+                  </template>
+                  <template v-else>
+                    <i class="el-icon-arrow-down"></i>
+                    展开更多回复 ({{ comment.children.length - 3 }}条)
+                  </template>
+                </span>
               </div>
             </div>
           </div>
@@ -191,24 +214,50 @@
         </el-button>
       </span>
     </el-dialog>
+
+    <!-- 图片预览 -->
+    <el-image-viewer
+      v-if="imagePreview.visible"
+      :url-list="imagePreview.urls"
+      :initial-index="imagePreview.index"
+      :on-close="closeImagePreview"
+    />
   </div>
 </template>
 
 <script>
 import { getPostDetail, getCommentList, addComment, deletePost, deleteComment, togglePostLike, toggleCommentLike } from '@/api/forum'
 import { DEFAULT_AVATAR } from '@/utils/constants'
-import { convertAvatarUrl } from '@/utils/oss'
 import { mapGetters } from 'vuex'
+import 'quill/dist/quill.core.css'
+import 'quill/dist/quill.snow.css'
+import ElImageViewer from 'element-ui/packages/image/src/image-viewer'
 
 export default {
   name: 'ForumDetail',
+  components: {
+    ElImageViewer
+  },
   computed: {
     ...mapGetters(['avatar', 'id']),
     currentUserAvatar() {
       return this.avatar || DEFAULT_AVATAR
     },
     isAuthor() {
-      return this.post && this.id && this.post.userName === this.id
+      return this.post && this.id && this.post.userId && String(this.post.userId) === String(this.id)
+    },
+    // 计算总评论数（一级评论 + 所有二级评论）
+    totalCommentCount() {
+      if (!this.comments || this.comments.length === 0) {
+        return 0
+      }
+      let total = this.comments.length // 一级评论数
+      this.comments.forEach(comment => {
+        if (comment.children && comment.children.length > 0) {
+          total += comment.children.length // 加上二级评论数
+        }
+      })
+      return total
     }
   },
   data() {
@@ -221,13 +270,28 @@ export default {
       replyDialogVisible: false,
       replyContent: '',
       replyToComment: null,
+      parentComment: null,
       submittingReply: false,
-      defaultAvatar: DEFAULT_AVATAR
+      defaultAvatar: DEFAULT_AVATAR,
+      expandedComments: {}, // 存储每个评论的展开状态
+      imagePreview: {
+        visible: false,
+        urls: [],
+        index: 0
+      },
+      bodyScrollLocked: false,
+      originalBodyOverflow: '',
+      originalHtmlOverflow: '',
+      scrollPosition: 0,
+      preventScrollHandler: null
     }
   },
   mounted() {
     this.loadPostDetail()
     this.loadComments()
+  },
+  beforeDestroy() {
+    this.unlockBodyScroll()
   },
   methods: {
     // 加载帖子详情
@@ -237,12 +301,14 @@ export default {
         const res = await getPostDetail(this.$route.params.id)
         if (res.code === 200) {
           this.post = res.post
-          // 处理头像URL
-          if (this.post.avatar) {
-            this.post.avatar = await convertAvatarUrl(this.post.avatar)
-          } else {
+          // 处理头像URL（后端已返回完整CDN地址，直接使用）
+          if (!this.post.avatar) {
             this.post.avatar = DEFAULT_AVATAR
           }
+          // 绑定帖子内容中的图片预览事件
+          this.$nextTick(() => {
+            this.bindPostContentImages()
+          })
         } else {
           this.$message.error(res.msg || '加载失败')
           this.goBack()
@@ -255,25 +321,38 @@ export default {
       }
     },
 
+    // 获取可见的子评论列表
+    getVisibleReplies(comment) {
+      if (!comment.children || comment.children.length === 0) {
+        return []
+      }
+      // 如果展开或子评论数量<=3，显示全部；否则只显示前3条
+      if (this.expandedComments[comment.commentId] || comment.children.length <= 3) {
+        return comment.children
+      }
+      return comment.children.slice(0, 3)
+    },
+
+    // 切换子评论展开/收起状态
+    toggleReplies(commentId) {
+      this.$set(this.expandedComments, commentId, !this.expandedComments[commentId])
+    },
+
     // 加载评论列表
     async loadComments() {
       try {
         const res = await getCommentList(this.$route.params.id)
         if (res.code === 200) {
           const comments = res.list || []
-          // 处理所有评论的头像URL
+          // 处理所有评论的头像URL（后端已返回完整CDN地址，直接使用）
           for (const comment of comments) {
-            if (comment.avatar) {
-              comment.avatar = await convertAvatarUrl(comment.avatar)
-            } else {
+            if (!comment.avatar) {
               comment.avatar = DEFAULT_AVATAR
             }
             // 处理子评论的头像
             if (comment.children && comment.children.length > 0) {
               for (const child of comment.children) {
-                if (child.avatar) {
-                  child.avatar = await convertAvatarUrl(child.avatar)
-                } else {
+                if (!child.avatar) {
                   child.avatar = DEFAULT_AVATAR
                 }
               }
@@ -322,13 +401,14 @@ export default {
     },
 
     // 回复评论
-    handleReply(comment) {
+    handleReply(comment, parentComment = null) {
       if (!this.id) {
         this.$message.warning('请先登录')
         this.$router.push('/login')
         return
       }
       this.replyToComment = comment
+      this.parentComment = parentComment // 保存父评论信息（如果是回复二级评论）
       this.replyContent = ''
       this.replyDialogVisible = true
     },
@@ -342,16 +422,28 @@ export default {
 
       this.submittingReply = true
       try {
+        // 如果是回复二级评论,parentId应该是一级评论的ID
+        const parentId = this.parentComment 
+          ? this.parentComment.commentId 
+          : this.replyToComment.commentId
+        
+        // 确保被回复用户的信息完整
+        const replyToUserName = this.replyToComment.userName || this.replyToComment.nickName || '未知用户'
+        const replyToNickName = this.replyToComment.nickName || this.replyToComment.userName
+        
         const res = await addComment({
           postId: this.post.postId,
           content: this.replyContent,
-          parentId: this.replyToComment.commentId,
+          parentId: parentId,
           replyToUserId: this.replyToComment.userId,
-          replyToUserName: this.replyToComment.userName
+          replyToUserName: replyToUserName,
+          replyToNickName: replyToNickName
         })
         if (res.code === 200) {
           this.$message.success('回复成功')
           this.replyDialogVisible = false
+          this.replyToComment = null
+          this.parentComment = null
           this.loadComments()
           this.loadPostDetail()
         } else {
@@ -446,13 +538,31 @@ export default {
 
     // 判断是否是评论作者
     isCommentAuthor(comment) {
-      return this.id && comment.userName === this.id
+      return this.id && comment.userId && String(comment.userId) === String(this.id)
     },
 
-    // 格式化内容（换行转br）
+    // 判断是否需要显示"回复@xxx"
+    // 类似B站的设计：二级评论回复一级评论时不显示，回复其他二级评论时才显示
+    shouldShowReplyTo(reply, parentComment) {
+      // 如果没有replyToUserName，不显示
+      if (!reply.replyToUserName) {
+        return false
+      }
+      // 如果回复的用户ID等于父评论（一级评论）的用户ID，不显示
+      // 因为二级评论默认就是回复一级评论的，不需要额外标注
+      if (reply.replyToUserId && parentComment.userId && 
+          String(reply.replyToUserId) === String(parentComment.userId)) {
+        return false
+      }
+      // 其他情况显示，即：二级评论回复另一个二级评论时
+      return true
+    },
+
+    // 格式化内容（直接返回富文本HTML）
     formatContent(content) {
       if (!content) return ''
-      return content.replace(/\n/g, '<br/>')
+      // 富文本内容已经是HTML格式，直接返回
+      return content
     },
 
     // 格式化时间
@@ -477,6 +587,76 @@ export default {
     // 返回列表
     goBack() {
       this.$router.push('/forum/index')
+    },
+
+    // 绑定帖子内容图片预览事件
+    bindPostContentImages() {
+      const postContent = document.querySelector('.post-content')
+      if (!postContent) return
+      
+      const images = postContent.querySelectorAll('img')
+      if (!images.length) return
+      
+      const urls = Array.from(images).map(img => img.src).filter(Boolean)
+      if (!urls.length) return
+      
+      images.forEach((img, index) => {
+        img.style.cursor = 'zoom-in'
+        img.onclick = (e) => {
+          e.preventDefault()
+          this.openImagePreview(urls, index)
+        }
+      })
+    },
+
+    // 打开图片预览
+    openImagePreview(urls, index) {
+      this.imagePreview = {
+        visible: true,
+        urls,
+        index
+      }
+      this.lockBodyScroll()
+    },
+
+    // 关闭图片预览
+    closeImagePreview() {
+      this.imagePreview.visible = false
+      this.unlockBodyScroll()
+    },
+
+    // 锁定页面滚动
+    lockBodyScroll() {
+      if (this.bodyScrollLocked) return
+      this.bodyScrollLocked = true
+      this.scrollPosition = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0
+      this.originalBodyOverflow = document.body.style.overflow
+      this.originalHtmlOverflow = document.documentElement.style.overflow
+      document.body.style.overflow = 'hidden'
+      document.documentElement.style.overflow = 'hidden'
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${this.scrollPosition}px`
+      document.body.style.width = '100%'
+      this.preventScrollHandler = e => e.preventDefault()
+      window.addEventListener('wheel', this.preventScrollHandler, { passive: false })
+      window.addEventListener('touchmove', this.preventScrollHandler, { passive: false })
+    },
+
+    // 解锁页面滚动
+    unlockBodyScroll() {
+      if (!this.bodyScrollLocked) return
+      this.bodyScrollLocked = false
+      document.body.style.overflow = this.originalBodyOverflow || ''
+      document.documentElement.style.overflow = this.originalHtmlOverflow || ''
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      if (this.preventScrollHandler) {
+        window.removeEventListener('wheel', this.preventScrollHandler)
+        window.removeEventListener('touchmove', this.preventScrollHandler)
+        this.preventScrollHandler = null
+      }
+      window.scrollTo(0, this.scrollPosition || 0)
     }
   }
 }
@@ -560,22 +740,50 @@ export default {
   color: #333;
   line-height: 1.8;
   margin-bottom: 24px;
-  white-space: pre-wrap;
   word-break: break-word;
+  padding: 0;
+  border: none;
 }
 
-.post-images {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-  margin-bottom: 24px;
+.post-content.ql-editor {
+  padding: 0;
 }
 
-.post-image {
-  width: 100%;
-  height: 200px;
-  border-radius: 12px;
-  cursor: pointer;
+::v-deep .post-content img {
+  max-width: 100px !important;
+  max-height: 100px !important;
+  width: auto !important;
+  height: auto !important;
+  border-radius: 8px;
+  display: block;
+  margin: 12px 0 0 0;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+  cursor: zoom-in;
+  transition: transform 0.3s ease;
+  object-fit: contain;
+}
+
+::v-deep .post-content img:hover {
+  transform: scale(1.02);
+}
+
+.post-content p {
+  min-height: auto;
+  margin-bottom: 12px;
+}
+
+.post-content pre {
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.post-content blockquote {
+  border-left: 4px solid #1ac89a;
+  padding-left: 16px;
+  margin: 16px 0;
+  color: #666;
 }
 
 .post-footer {
@@ -703,6 +911,18 @@ export default {
   color: #333;
 }
 
+.author-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1ac89a;
+  background: linear-gradient(135deg, rgba(26, 200, 154, 0.1) 0%, rgba(22, 160, 133, 0.1) 100%);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(26, 200, 154, 0.3);
+}
+
 .comment-time {
   font-size: 12px;
   color: #999;
@@ -806,13 +1026,46 @@ export default {
 
 .sub-comment-actions {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
   margin-left: 40px;
 }
 
 .sub-comment-time {
   font-size: 12px;
   color: #999;
+  margin-right: 4px;
+}
+
+/* 子评论展开/收起按钮 */
+.sub-comments-toggle {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e8e8e8;
+  text-align: center;
+}
+
+.toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #1ac89a;
+  cursor: pointer;
+  padding: 6px 16px;
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  user-select: none;
+}
+
+.toggle-btn:hover {
+  background: rgba(26, 200, 154, 0.1);
+  color: #16a085;
+}
+
+.toggle-btn i {
+  font-size: 12px;
+  transition: transform 0.3s ease;
 }
 
 /* 空评论状态 */

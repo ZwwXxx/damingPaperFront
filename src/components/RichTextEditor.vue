@@ -25,7 +25,6 @@ import 'quill/dist/quill.core.css'
 import 'quill/dist/quill.snow.css'
 import 'quill/dist/quill.bubble.css'
 import { getToken } from '@/utils/auth'
-import { getOssSign } from '@/api/common'
 import ElImageViewer from 'element-ui/packages/image/src/image-viewer'
 
 export default {
@@ -95,7 +94,6 @@ export default {
                 index: 0
             },
             isUploading: false,
-            imageUrlCache: {},
             bodyScrollLocked: false,
             scrollPosition: 0,
             originalBodyOverflow: '',
@@ -203,9 +201,12 @@ export default {
             const selection = quill.getSelection && quill.getSelection()
             const length = selection ? selection.index : quill.getLength()
             const { objectName, displayUrl } = await this.resolveUploadResult(res)
-            const insertUrl = displayUrl || (objectName ? this.buildLocalUrl(objectName) : '')
+            // 确保优先使用完整的CDN地址
+            const insertUrl = displayUrl
+            
+            
             if (!insertUrl) {
-                this.$message.error('图片插入失败')
+                this.$message.error('图片插入失败：未获取到完整的CDN地址')
                 return
             }
             quill.insertEmbed(length, 'image', insertUrl)
@@ -213,21 +214,10 @@ export default {
             this.markInsertedImage(length, objectName, insertUrl)
         },
         async resolveUploadResult(res) {
-            let objectName = res.fileName || (res.data && res.data.fileName) || res.newFileName
-            objectName = this.normalizeOssKey(objectName)
-            let displayUrl = ''
-            if (objectName) {
-                displayUrl = await this.getSignedImageUrl(objectName)
-            }
-            if (!displayUrl) {
-                displayUrl = res.url || (res.data && res.data.url) || ''
-            }
-            if (!displayUrl && objectName) {
-                displayUrl = this.buildLocalUrl(objectName)
-            }
+            // 超级简单：直接使用url字段
             return {
-                objectName,
-                displayUrl
+                objectName: res.fileName || '',  // 纯文件路径
+                displayUrl: res.url || ''        // 完整CDN地址
             }
         },
         buildLocalUrl(path) {
@@ -279,20 +269,12 @@ export default {
             return clone.innerHTML
         },
         sanitizeImageNode(img) {
+            // 简化：不要修改src，保持完整CDN地址
+            // 现在所有图片都是完整CDN地址，不需要任何转换
             if (!img) {
                 return
             }
-            const ossKey = this.getImageOssKey(img)
-            if (ossKey) {
-                img.setAttribute('src', ossKey)
-                img.setAttribute('data-oss-key', ossKey)
-                img.setAttribute('data-src', ossKey)
-                return
-            }
-            const src = img.getAttribute('src') || ''
-            if (this.isSignedOssUrl(src)) {
-                img.setAttribute('src', src.split('?')[0])
-            }
+            // 什么都不做，保持原始的完整CDN地址
         },
         async prepareEditorImages() {
             if (!this.Quill || !this.Quill.root) {
@@ -305,20 +287,29 @@ export default {
             await Promise.all(images.map(img => this.prepareImageNode(img)))
         },
         async prepareImageNode(img) {
+            // 简化：如果图片已经是完整CDN地址，不要动它
             if (!img) {
                 return
             }
+            
+            const currentSrc = img.getAttribute('src') || ''
+            
+            // 如果已经是完整CDN地址，直接返回，不做任何处理
+            if (currentSrc.startsWith('https://daming-paper.oss-cn-guangzhou.aliyuncs.com')) {
+                return
+            }
+            
+            // 如果是相对路径，才进行处理
             const ossKey = this.getImageOssKey(img)
             if (!ossKey) {
                 return
             }
+            
+            // 转换为完整CDN地址
+            const fullUrl = `https://daming-paper.oss-cn-guangzhou.aliyuncs.com/${ossKey}`
+            img.setAttribute('src', fullUrl)
             img.setAttribute('data-oss-key', ossKey)
             img.setAttribute('data-src', ossKey)
-            const signedUrl = await this.getSignedImageUrl(ossKey)
-            const finalSrc = signedUrl || this.buildLocalUrl(ossKey) || ossKey
-            if (finalSrc) {
-                img.setAttribute('src', finalSrc)
-            }
         },
         getImageOssKey(img) {
             if (!img) {
@@ -351,7 +342,7 @@ export default {
                 try {
                     const url = new URL(trimmed)
                     const host = url.hostname || ''
-                    if (!this.isLikelyOssHost(host) && !this.isSignedOssUrl(trimmed)) {
+                    if (!this.isLikelyOssHost(host)) {
                         return ''
                     }
                     return url.pathname.replace(/^\/+/, '')
@@ -371,38 +362,6 @@ export default {
                 return false
             }
             return /aliyuncs\.com/i.test(host) || host.indexOf('oss-') !== -1
-        },
-        isSignedOssUrl(value) {
-            if (!value) {
-                return false
-            }
-            return /[?&](OSSAccessKeyId|Signature|Expires)=/i.test(value)
-        },
-        async getSignedImageUrl(objectName) {
-            const ossKey = this.normalizeOssKey(objectName)
-            if (!ossKey) {
-                return ''
-            }
-            const cache = this.imageUrlCache[ossKey]
-            const now = Date.now()
-            if (cache && cache.expireAt > now) {
-                return cache.url
-            }
-            try {
-                const signRes = await getOssSign({ objectName: ossKey })
-                const signedUrl = signRes.url || (signRes.data && signRes.data.url)
-                if (signedUrl) {
-                    const expireSeconds = signRes.expireSeconds || (signRes.data && signRes.data.expireSeconds) || 300
-                    this.imageUrlCache[ossKey] = {
-                        url: signedUrl,
-                        expireAt: now + expireSeconds * 1000 - 5000
-                    }
-                    return signedUrl
-                }
-            } catch (error) {
-                console.warn('获取签名地址失败', error)
-            }
-            return ''
         },
         bindImagePreviewEvents() {
             if (!this.Quill || !this.Quill.root) {

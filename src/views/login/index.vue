@@ -103,14 +103,14 @@
         <!-- Tab切换 -->
         <div class="tab-wrapper">
           <div 
-            @click="activeTab = 'code'"
-            :class="['tab-item', { 'tab-active': activeTab === 'code' }]">
-            <span>验证码登录</span>
-          </div>
-          <div 
             @click="activeTab = 'password'"
             :class="['tab-item', { 'tab-active': activeTab === 'password' }]">
             <span>密码登录</span>
+          </div>
+          <div 
+            @click="activeTab = 'code'"
+            :class="['tab-item', { 'tab-active': activeTab === 'code' }]">
+            <span>验证码登录</span>
           </div>
           <div class="tab-slider" :style="sliderStyle"></div>
         </div>
@@ -344,7 +344,7 @@ export default {
     // 计算tab滑块位置
     sliderStyle() {
       return {
-        transform: this.activeTab === 'code' ? 'translateX(0)' : 'translateX(100%)'
+        transform: this.activeTab === 'password' ? 'translateX(0)' : 'translateX(100%)'
       }
     }
   },
