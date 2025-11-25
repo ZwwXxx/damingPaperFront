@@ -52,9 +52,8 @@
                 <span>
                   <span class="text-red-800 font-bold mr-2" :id="questionItem.itemOrder">{{ 
                       getQuestionDisplayNumber(questionItem)
-                    }}.</span>{{
-                    questionItem.questionTitle
-                  }}
+                    }}.</span>
+                  <span class="question-title-content" v-html="sanitizeHtml(questionItem.questionTitle)"></span>
                 </span>
                 <span class="font-bold text-red-600">
                     ({{
@@ -71,46 +70,55 @@
             <el-radio-group
                 v-if="questionItem.questionType===1"
                 v-removeAria
-                v-model="answer.questionAnswerDtos[questionItem.itemOrder].content"
+                v-model="answerMap[questionItem.itemOrder].content"
                 @change="handleSingleRadioChange(questionItem.itemOrder, $event)">
               <el-radio class="py-2" :label="selection.prefix"
                         v-for="(selection,index) in questionItem.items" :key="index">
-                {{ selection.prefix }}.{{ selection.content }}
+                <span class="option-content">
+                  <span class="option-prefix">{{ selection.prefix }}.</span>
+                  <span class="option-text" v-html="sanitizeHtml(selection.content)"></span>
+                </span>
               </el-radio>
             </el-radio-group>
-            <el-checkbox-group v-model="answer.questionAnswerDtos[questionItem.itemOrder].contentArray"
+            <el-checkbox-group v-model="answerMap[questionItem.itemOrder].contentArray"
                                v-if="questionItem.questionType===2"
                                @change="updateCompletedStatus(questionItem.itemOrder)"
             >
               <el-checkbox v-for="(checkBox,index) in questionItem.items" :label="checkBox.prefix" :key="index">
-                {{ checkBox.prefix }}
+                <span class="option-content">
+                  <span class="option-prefix">{{ checkBox.prefix }}.</span>
+                  <span class="option-text" v-html="sanitizeHtml(checkBox.content)"></span>
+                </span>
               </el-checkbox>
             </el-checkbox-group>
             <el-radio-group
                 v-if="questionItem.questionType===4"
-                v-model="answer.questionAnswerDtos[questionItem.itemOrder].content"
+                v-model="answerMap[questionItem.itemOrder].content"
                 @change="updateCompletedStatus(questionItem.itemOrder)"
                 v-removeAria>
               <el-radio class="py-2" :label="selection.prefix"
                         v-for="(selection,index) in questionItem.items" :key="index">
-                {{ selection.prefix }}.{{ selection.content }}
+                <span class="option-content">
+                  <span class="option-prefix">{{ selection.prefix }}.</span>
+                  <span class="option-text" v-html="sanitizeHtml(selection.content)"></span>
+                </span>
               </el-radio>
             </el-radio-group>
-            <rich-text-editor
+            <editor
                 v-if="questionItem.questionType===3"
                 class="answer-rich-text"
                 :min-height="220"
                 :placeholder="'请输入答案（可插入图片、富文本）'"
-                v-model="answer.questionAnswerDtos[questionItem.itemOrder].content"
-                @change="updateCompletedStatus(questionItem.itemOrder)"
+                v-model="answerMap[questionItem.itemOrder].content"
+                @on-change="handleTextChange(questionItem.itemOrder, $event)"
             />
             <el-input
                 v-if="questionItem.questionType===5"
-                v-model="answer.questionAnswerDtos[questionItem.itemOrder].content"
+                v-model="answerMap[questionItem.itemOrder].content"
                 type="textarea"
                 :rows="3"
                 placeholder="请输入填空题答案"
-                @change="updateCompletedStatus(questionItem.itemOrder)"
+                @input="updateCompletedStatus(questionItem.itemOrder)"
             />
           </div>
         </div>
@@ -127,9 +135,8 @@
                 <span>
                   <span class="text-red-800 font-bold mr-2" :id="currentQuestion.itemOrder">{{ 
                       getQuestionDisplayNumber(currentQuestion)
-                    }}.</span>{{
-                    currentQuestion.questionTitle
-                  }}
+                    }}.</span>
+                  <span class="question-title-content" v-html="sanitizeHtml(currentQuestion.questionTitle)"></span>
                 </span>
                 <span class="font-bold text-red-600">
                     ({{
@@ -142,46 +149,55 @@
             <el-radio-group
                 v-if="currentQuestion.questionType===1"
                 v-removeAria
-                v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content"
+                v-model="answerMap[currentQuestion.itemOrder].content"
                 @change="handleSingleRadioChange(currentQuestion.itemOrder, $event)">
               <el-radio class="py-2" :label="selection.prefix"
                         v-for="(selection,index) in currentQuestion.items" :key="index">
-                {{ selection.prefix }}.{{ selection.content }}
+                <span class="option-content">
+                  <span class="option-prefix">{{ selection.prefix }}.</span>
+                  <span class="option-text" v-html="sanitizeHtml(selection.content)"></span>
+                </span>
               </el-radio>
             </el-radio-group>
-            <el-checkbox-group v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].contentArray"
+            <el-checkbox-group v-model="answerMap[currentQuestion.itemOrder].contentArray"
                                v-if="currentQuestion.questionType===2"
                                @change="updateCompletedStatus(currentQuestion.itemOrder)"
             >
               <el-checkbox v-for="(checkBox,index) in currentQuestion.items" :label="checkBox.prefix" :key="index">
-                {{ checkBox.prefix }}
+                <span class="option-content">
+                  <span class="option-prefix">{{ checkBox.prefix }}.</span>
+                  <span class="option-text" v-html="sanitizeHtml(checkBox.content)"></span>
+                </span>
               </el-checkbox>
             </el-checkbox-group>
             <el-radio-group
                 v-if="currentQuestion.questionType===4"
-                v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content"
+                v-model="answerMap[currentQuestion.itemOrder].content"
                 @change="updateCompletedStatus(currentQuestion.itemOrder)"
                 v-removeAria>
               <el-radio class="py-2" :label="selection.prefix"
                         v-for="(selection,index) in currentQuestion.items" :key="index">
-                {{ selection.prefix }}.{{ selection.content }}
+                <span class="option-content">
+                  <span class="option-prefix">{{ selection.prefix }}.</span>
+                  <span class="option-text" v-html="sanitizeHtml(selection.content)"></span>
+                </span>
               </el-radio>
             </el-radio-group>
-            <rich-text-editor
+            <editor
                 v-if="currentQuestion.questionType===3"
                 class="answer-rich-text"
                 :min-height="220"
                 :placeholder="'请输入答案（可插入图片、富文本）'"
-                v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content"
-                @change="updateCompletedStatus(currentQuestion.itemOrder)"
+                v-model="answerMap[currentQuestion.itemOrder].content"
+                @on-change="handleTextChange(currentQuestion.itemOrder, $event)"
             />
             <el-input
                 v-if="currentQuestion.questionType===5"
-                v-model="answer.questionAnswerDtos[currentQuestion.itemOrder].content"
+                v-model="answerMap[currentQuestion.itemOrder].content"
                 type="textarea"
                 :rows="3"
                 placeholder="请输入填空题答案"
-                @change="updateCompletedStatus(currentQuestion.itemOrder)"
+                @input="updateCompletedStatus(currentQuestion.itemOrder)"
             />
           </div>
         </div>
@@ -224,16 +240,26 @@
         </button>
       </div>
     </el-card>
+    
+    <!-- 图片预览 -->
+    <el-image-viewer
+      v-if="imagePreview.visible"
+      :url-list="imagePreview.urls"
+      :initial-index="imagePreview.index"
+      :on-close="closeImagePreview"
+    />
   </wrapper>
 </template>
 
 <script>
   import wrapper from "@/components/wrapper.vue";
-  import RichTextEditor from "@/components/RichTextEditor.vue";
+  import Editor from "@/components/Editor";
   import {getPaper} from "@/api/paper";
   import {submitAnswer} from "@/api/paperAnswer";
   import {formatSeconds} from "@/utils/time"
   import {getOrCreateShuffledOrder, clearShuffledOrder} from "@/utils/shuffle";
+  import DOMPurify from 'dompurify';
+  import ElImageViewer from "element-ui/packages/image/src/image-viewer";
 
 export default {
   name: "index",
@@ -252,7 +278,7 @@ export default {
       this.$router.replace({path: '/home'})
     }
   },
-  components: {wrapper, RichTextEditor},
+  components: {wrapper, Editor, ElImageViewer},
   data() {
     return {
       timer: undefined,
@@ -305,6 +331,13 @@ export default {
         3: '主观题',
         4: '判断题',
         5: '填空题'
+      },
+      isCollapse: false,
+      // 图片预览
+      imagePreview: {
+        visible: false,
+        urls: [],
+        index: 0
       }
     }
   },
@@ -321,9 +354,43 @@ export default {
   watch: {
     antiCheatEnabled() {
       this.syncAntiCheatState()
+    },
+    // 深度监听答案数组的变化
+    'answer.questionAnswerDtos': {
+      handler(newVal) {
+        if (!newVal) return;
+        // 当答案内容变化时，自动更新completed状态
+        newVal.forEach(answer => {
+          if (!answer) return;
+          let shouldBeCompleted = false;
+          if (Array.isArray(answer.contentArray) && answer.contentArray.length > 0) {
+            shouldBeCompleted = true;
+          } else if (answer.content) {
+            const contentStr = answer.content.toString().trim();
+            shouldBeCompleted = contentStr.length > 0;
+          }
+          
+          // 如果状态不一致，更新它
+          if (answer.completed !== shouldBeCompleted) {
+            this.$set(answer, 'completed', shouldBeCompleted);
+            console.log(`自动更新题目${answer.itemOrder} completed:`, shouldBeCompleted);
+          }
+        });
+      },
+      deep: true
     }
   },
   computed: {
+    // 创建答案映射，通过itemOrder快速查找对应的答案
+    answerMap() {
+      const map = {}
+      if (this.answer && this.answer.questionAnswerDtos) {
+        this.answer.questionAnswerDtos.forEach(answer => {
+          map[answer.itemOrder] = answer
+        })
+      }
+      return map
+    },
     currentQuestion() {
       return this.orderedQuestions[this.currentQuestionIndex] || null
     },
@@ -335,6 +402,24 @@ export default {
     }
   },
   methods: {
+    /**
+     * 使用DOMPurify清理HTML内容，防止XSS攻击
+     * @param {string} html - 原始HTML内容
+     * @returns {string} - 清理后的安全HTML
+     */
+    sanitizeHtml(html) {
+      if (!html) return '';
+      // 如果是纯文本（不包含HTML标签），直接返回
+      if (!/<[^>]+>/.test(html)) {
+        return html;
+      }
+      // 使用DOMPurify清理HTML
+      return DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target'],
+        ALLOW_DATA_ATTR: false
+      });
+    },
     getQuestionTypeName(questType) {
       const rawType = questType && (questType.questionType || questType.type);
       const name = questType && questType.name;
@@ -666,29 +751,47 @@ export default {
       }
     },
     handleSingleRadioChange(itemOrder, option) {
-      const answer = this.answer.questionAnswerDtos[itemOrder]
-      if (!answer) return
+      const answer = this.answerMap[itemOrder]
+      if (!answer) {
+        console.warn('单选题答案未找到，itemOrder:', itemOrder);
+        return
+      }
       answer.content = option
-      answer.completed = true
+      console.log(`单选题${itemOrder} 选择了:`, option, 'completed设为true');
+      // 使用$set确保Vue能检测到变化
+      this.$set(answer, 'completed', true)
     },
     updateCompletedStatus(itemOrder) {
-      const answer = this.answer.questionAnswerDtos[itemOrder];
-      if (!answer) return;
-      if (Array.isArray(answer.contentArray)) {
-        answer.completed = answer.contentArray.length > 0;
-      } else {
-        answer.completed = !!(answer.content && answer.content.toString().trim());
+      const answer = this.answerMap[itemOrder];
+      if (!answer) {
+        console.warn('答案未找到，itemOrder:', itemOrder);
+        return;
       }
+      let isCompleted;
+      if (Array.isArray(answer.contentArray)) {
+        isCompleted = answer.contentArray.length > 0;
+      } else {
+        isCompleted = !!(answer.content && answer.content.toString().trim());
+      }
+      console.log(`题目${itemOrder} completed状态更新:`, isCompleted, '内容:', answer.content);
+      // 使用$set确保Vue能检测到变化
+      this.$set(answer, 'completed', isCompleted);
     },
     handleTextChange(itemOrder, payload = {}) {
-      const answer = this.answer.questionAnswerDtos[itemOrder];
-      if (!answer) return;
+      const answer = this.answerMap[itemOrder];
+      if (!answer) {
+        console.warn('主观题答案未找到，itemOrder:', itemOrder);
+        return;
+      }
       const html = Object.prototype.hasOwnProperty.call(payload, 'html') ? payload.html : answer.content || ''
       const text = typeof payload.text === 'string' ? payload.text : ''
       answer.content = html
       const plainText = text || html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ')
       const hasImage = typeof html === 'string' && /<img[\s\S]*?>/i.test(html)
-      answer.completed = hasImage || !!(plainText && plainText.trim());
+      const isCompleted = hasImage || !!(plainText && plainText.trim());
+      console.log(`主观题${itemOrder} completed状态:`, isCompleted, 'html长度:', html.length, 'text:', plainText.substring(0, 20));
+      // 使用$set确保Vue能检测到变化
+      this.$set(answer, 'completed', isCompleted);
     },
     // 格式化日期为时分秒
     formatSeconds(remainTime) {
@@ -805,17 +908,27 @@ export default {
       window.scrollTo({top: 0, behavior: 'smooth'})
     },
     getQuestionTagType(itemOrder, displayIndex) {
-      if (this.antiCheatActive) {
-        const isCurrent = typeof displayIndex === 'number'
-            ? displayIndex === this.currentQuestionIndex
-            : itemOrder === this.currentQuestionOrder
-        if (isCurrent) {
-          return 'primary'
-        }
-      } else if (itemOrder === this.currentQuestionOrder) {
+      // 使用answerMap通过itemOrder获取答案
+      const answer = this.answerMap[itemOrder]
+      const isCompleted = answer ? answer.completed : false
+      
+      // 判断是否为当前题目
+      const isCurrent = this.antiCheatActive
+        ? (typeof displayIndex === 'number' ? displayIndex === this.currentQuestionIndex : itemOrder === this.currentQuestionOrder)
+        : itemOrder === this.currentQuestionOrder
+      
+      // 已完成的题目显示绿色，即使是当前题目
+      if (isCompleted) {
+        return 'success'
+      }
+      
+      // 当前题目但未完成显示蓝色
+      if (isCurrent) {
         return 'primary'
       }
-      return this.answer.questionAnswerDtos[itemOrder].completed ? 'success' : 'plain'
+      
+      // 其他未完成显示灰色
+      return 'plain'
     },
     handleQuestionAnchorClick(itemOrder, displayIndex) {
       if (this.antiCheatActive) {
@@ -881,6 +994,8 @@ export default {
       this.initRemainTime()
       // 时间开始倒计时
       this.timeReduce()
+      // 绑定题干图片预览事件
+      this.bindQuestionImagePreview()
     },
     checkPaperWindow(paper = {}) {
       const {start, end} = this.getPaperTimeRange(paper)
@@ -985,6 +1100,72 @@ export default {
           }
         }
       });
+    },
+    // 绑定题干和选项图片预览事件
+    bindQuestionImagePreview() {
+      this.$nextTick(() => {
+        // 绑定题干图片预览和强制尺寸限制
+        const questionTitleElements = document.querySelectorAll('.question-title-content');
+        questionTitleElements.forEach(element => {
+          const images = element.querySelectorAll('img');
+          images.forEach((img, index) => {
+            // 强制设置图片尺寸
+            img.style.maxWidth = '200px';
+            img.style.maxHeight = '200px';
+            img.style.width = 'auto';
+            img.style.height = 'auto';
+            img.style.display = 'inline-block';
+            img.style.cursor = 'zoom-in';
+            img.onclick = (e) => {
+              e.preventDefault();
+              const allImages = Array.from(element.querySelectorAll('img'));
+              const urls = allImages.map(image => image.getAttribute('src')).filter(Boolean);
+              if (urls.length > 0) {
+                const clickedIndex = allImages.indexOf(img);
+                this.openImagePreview(urls, clickedIndex >= 0 ? clickedIndex : 0);
+              }
+            };
+          });
+        });
+
+        // 绑定选项图片预览和强制尺寸限制
+        const optionTextElements = document.querySelectorAll('.option-text');
+        optionTextElements.forEach(element => {
+          const images = element.querySelectorAll('img');
+          images.forEach((img, index) => {
+            // 强制设置选项图片尺寸
+            img.style.maxWidth = '200px';
+            img.style.maxHeight = '200px';
+            img.style.width = 'auto';
+            img.style.height = 'auto';
+            img.style.display = 'inline-block';
+            img.style.cursor = 'zoom-in';
+            img.onclick = (e) => {
+              e.preventDefault();
+              const allImages = Array.from(element.querySelectorAll('img'));
+              const urls = allImages.map(image => image.getAttribute('src')).filter(Boolean);
+              if (urls.length > 0) {
+                const clickedIndex = allImages.indexOf(img);
+                this.openImagePreview(urls, clickedIndex >= 0 ? clickedIndex : 0);
+              }
+            };
+          });
+        });
+      });
+    },
+    // 打开图片预览
+    openImagePreview(urls, index) {
+      this.imagePreview = {
+        visible: true,
+        urls: urls,
+        index: index
+      };
+    },
+    // 关闭图片预览
+    closeImagePreview() {
+      this.imagePreview.visible = false;
+      this.imagePreview.urls = [];
+      this.imagePreview.index = 0;
     }
   },
 }
@@ -1048,5 +1229,189 @@ export default {
 }
 .answer-rich-text .ql-editor p {
   min-height: 20px;
+}
+
+/* 富文本题干样式 */
+.question-title-content {
+  display: inline;
+  word-break: break-word;
+}
+
+/* 全局强制覆盖题干图片尺寸 */
+.question-title-content >>> img,
+.question-title-content img[src] {
+  max-width: 200px !important;
+  max-height: 200px !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-block !important;
+  margin: 10px 0 !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: zoom-in;
+  transition: transform 0.2s ease;
+}
+
+.question-title-content >>> img:hover {
+  transform: scale(1.02);
+}
+
+/* 确保所有块级元素都内联显示，防止换行 */
+.question-title-content >>> p,
+.question-title-content >>> div,
+.question-title-content >>> h1,
+.question-title-content >>> h2,
+.question-title-content >>> h3,
+.question-title-content >>> h4,
+.question-title-content >>> h5,
+.question-title-content >>> h6 {
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.question-title-content >>> br {
+  display: none !important;
+}
+
+.question-title-content strong {
+  font-weight: bold;
+}
+
+.question-title-content em {
+  font-style: italic;
+}
+
+.question-title-content u {
+  text-decoration: underline;
+}
+
+.question-title-content ol,
+.question-title-content ul {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+.question-title-content code {
+  background-color: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+.question-title-content pre {
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 10px 0;
+}
+
+.question-title-content blockquote {
+  border-left: 4px solid #ddd;
+  padding-left: 10px;
+  margin: 10px 0;
+  color: #666;
+}
+
+/* 选项富文本样式 */
+.option-content {
+  display: inline-flex;
+  align-items: flex-start;
+  word-break: break-word;
+  width: 100%;
+}
+
+.option-prefix {
+  font-weight: bold;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.option-text {
+  flex: 1;
+  display: inline-block;
+}
+
+/* 修复单选框和复选框布局 */
+.el-radio, .el-checkbox {
+  display: flex !important;
+  align-items: flex-start !important;
+  margin-bottom: 12px !important;
+}
+
+.el-radio__input, .el-checkbox__input {
+  margin-top: 2px !important;
+}
+
+.el-radio__label, .el-checkbox__label {
+  flex: 1 !important;
+  padding-left: 8px !important;
+}
+
+.option-text img {
+  max-width: 200px !important;
+  max-height: 200px !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-block !important;
+  margin: 5px 0 !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: zoom-in;
+  transition: transform 0.2s ease;
+  vertical-align: top;
+}
+
+.option-text img:hover {
+  transform: scale(1.02);
+}
+
+.option-text p {
+  display: inline;
+  margin: 0;
+}
+
+.option-text strong {
+  font-weight: bold;
+}
+
+.option-text em {
+  font-style: italic;
+}
+
+.option-text u {
+  text-decoration: underline;
+}
+
+.option-text ol,
+.option-text ul {
+  margin: 5px 0;
+  padding-left: 15px;
+}
+
+.option-text code {
+  background-color: #f5f5f5;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.option-text pre {
+  background-color: #f5f5f5;
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 5px 0;
+  font-size: 0.9em;
+}
+
+.option-text blockquote {
+  border-left: 3px solid #ddd;
+  padding-left: 8px;
+  margin: 5px 0;
+  color: #666;
+  font-style: italic;
 }
 </style>

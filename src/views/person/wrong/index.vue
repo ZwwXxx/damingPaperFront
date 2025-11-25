@@ -46,7 +46,9 @@
            :key="item.answerId">
         <div class="flex justify-between items-center border-b pb-2 mb-3">
           <div>
-            <p class="font-semibold text-lg text-gray-800">{{ item.questionTitle || '题目' }}</p>
+            <p class="font-semibold text-lg text-gray-800">
+              <span class="question-title-content" v-html="sanitizeHtml(item.questionTitle || '题目')"></span>
+            </p>
             <p class="text-xs text-gray-500 mt-1">
               试卷：{{ item.paperName || '-' }} ｜ 科目：{{ transferSubject(item.subjectId) }} ｜ 上次作答：{{ item.createTime || '-' }}
             </p>
@@ -110,6 +112,7 @@
 import {getWrongQuestionList} from "@/api/questionAnswer";
 import {optionSubject} from "@/api/subject";
 import ElImageViewer from "element-ui/packages/image/src/image-viewer";
+import DOMPurify from 'dompurify';
 
 export default {
   name: "wrongRecord",
@@ -143,6 +146,20 @@ export default {
     this.getWrongList()
   },
   methods: {
+    /**
+     * 使用DOMPurify清理HTML内容，防止XSS攻击
+     */
+    sanitizeHtml(html) {
+      if (!html) return '';
+      if (!/<[^>]+>/.test(html)) {
+        return html;
+      }
+      return DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target'],
+        ALLOW_DATA_ATTR: false
+      });
+    },
     async loadSubjects() {
       const res = await optionSubject()
       const list = res.data || []
@@ -188,6 +205,8 @@ export default {
       try {
         const res = await getWrongQuestionList(this.buildQuery())
         this.wrongList = this.applySort(res.data || [])
+        // 绑定题干图片预览事件
+        this.bindQuestionImagePreview()
       } finally {
         this.loading = false
       }
@@ -263,6 +282,27 @@ export default {
       this.imagePreview.visible = false
       this.imagePreview.urls = []
       this.imagePreview.index = 0
+    },
+    // 绑定题干图片预览事件
+    bindQuestionImagePreview() {
+      this.$nextTick(() => {
+        const questionTitleElements = document.querySelectorAll('.question-title-content');
+        questionTitleElements.forEach(element => {
+          const images = element.querySelectorAll('img');
+          images.forEach((img, index) => {
+            img.style.cursor = 'zoom-in';
+            img.onclick = (e) => {
+              e.preventDefault();
+              const allImages = Array.from(element.querySelectorAll('img'));
+              const urls = allImages.map(image => image.getAttribute('src')).filter(Boolean);
+              if (urls.length > 0) {
+                const clickedIndex = allImages.indexOf(img);
+                this.openImagePreview(urls, clickedIndex >= 0 ? clickedIndex : 0);
+              }
+            };
+          });
+        });
+      });
     }
   }
 }
@@ -331,6 +371,94 @@ export default {
 
 .rich-answer >>> p {
   margin: 4px 0;
+}
+
+/* 富文本题干样式 */
+.question-title-content {
+  display: inline;
+  word-break: break-word;
+}
+
+.question-title-content >>> img {
+  max-width: 200px !important;
+  max-height: 200px !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-block !important;
+  margin: 10px 0 !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: zoom-in;
+  transition: transform 0.2s ease;
+}
+
+.question-title-content >>> img:hover {
+  transform: scale(1.02);
+}
+
+/* 确保所有块级元素都内联显示，防止换行 */
+.question-title-content >>> p,
+.question-title-content >>> div,
+.question-title-content >>> h1,
+.question-title-content >>> h2,
+.question-title-content >>> h3,
+.question-title-content >>> h4,
+.question-title-content >>> h5,
+.question-title-content >>> h6 {
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.question-title-content >>> br {
+  display: none !important;
+}
+
+.question-title-content >>> strong {
+  font-weight: bold;
+}
+
+.question-title-content >>> em {
+  font-style: italic;
+}
+
+.question-title-content >>> u {
+  text-decoration: underline;
+}
+
+/* 选项富文本样式 */
+.option-content {
+  display: flex;
+  align-items: flex-start;
+  word-break: break-word;
+}
+
+.option-prefix {
+  font-weight: bold;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.option-text {
+  flex: 1;
+}
+
+.option-text >>> img {
+  max-width: 200px;
+  max-height: 200px;
+  width: auto;
+  height: auto;
+  display: inline-block;
+  margin: 5px 0;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: zoom-in;
+  transition: transform 0.2s ease;
+  vertical-align: top;
+}
+
+.option-text >>> img:hover {
+  transform: scale(1.02);
 }
 </style>
 

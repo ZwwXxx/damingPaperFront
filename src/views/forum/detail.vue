@@ -544,16 +544,23 @@ export default {
     // 判断是否需要显示"回复@xxx"
     // 类似B站的设计：二级评论回复一级评论时不显示，回复其他二级评论时才显示
     shouldShowReplyTo(reply, parentComment) {
-      // 如果没有replyToUserName，不显示
-      if (!reply.replyToUserName) {
+      // 如果没有replyToUserName和replyToNickName，不显示
+      if (!reply.replyToUserName && !reply.replyToNickName) {
         return false
       }
-      // 如果回复的用户ID等于父评论（一级评论）的用户ID，不显示
+      
+      // 如果回复的用户ID和用户名都等于父评论（一级评论）的作者，不显示
       // 因为二级评论默认就是回复一级评论的，不需要额外标注
       if (reply.replyToUserId && parentComment.userId && 
           String(reply.replyToUserId) === String(parentComment.userId)) {
-        return false
+        // 进一步验证：用户名也要匹配，防止ID相同但实际是不同用户的情况
+        const replyToName = reply.replyToNickName || reply.replyToUserName
+        const parentName = parentComment.nickName || parentComment.userName
+        if (replyToName === parentName) {
+          return false
+        }
       }
+      
       // 其他情况显示，即：二级评论回复另一个二级评论时
       return true
     },

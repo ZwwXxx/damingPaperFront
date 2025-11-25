@@ -37,7 +37,11 @@
           </div>
           <div class="question-item p-4" v-for="(question,index) in questionType.questionDtos" :key="index">
             <div class="q-title" :id="question.itemOrder">
-              <p>{{ question.itemOrder + 1 }}. {{ question.questionTitle }}( {{ question.score }}分 )</p>
+              <p>
+                <span>{{ question.itemOrder + 1 }}. </span>
+                <span class="question-title-content" v-html="sanitizeHtml(question.questionTitle)"></span>
+                <span>( {{ question.score }}分 )</span>
+              </p>
             </div>
             <div class="q-options p-6 flex flex-col ">
               <el-radio-group
@@ -49,14 +53,19 @@
                     disabled
                     class="py-2" :label="selection.prefix"
                     v-for="(selection,index) in question.items" :key="index">
-                  {{ selection.prefix }}.{{ selection.content }}
-
+                  <span class="option-content">
+                    <span class="option-prefix">{{ selection.prefix }}.</span>
+                    <span class="option-text" v-html="sanitizeHtml(selection.content)"></span>
+                  </span>
                 </el-radio>
               </el-radio-group>
               <el-checkbox-group v-model="answerMap[question.itemOrder].contentArray"
                                  v-if="question.questionType===2 && answerMap[question.itemOrder]">
                 <el-checkbox disabled v-for="(checkBox,index) in question.items" :label="checkBox.prefix" :key="index">
-                  {{ checkBox.prefix }}
+                  <span class="option-content">
+                    <span class="option-prefix">{{ checkBox.prefix }}.</span>
+                    <span class="option-text" v-html="sanitizeHtml(checkBox.content)"></span>
+                  </span>
                 </el-checkbox>
               </el-checkbox-group>
             </div>
@@ -176,6 +185,7 @@ import ai from "@/components/ai.vue";
 import ElImageViewer from "element-ui/packages/image/src/image-viewer";
 import {addFavorite, getFavoriteList, removeFavorite} from "@/api/questionFavorite";
 import { getOssSign } from "@/api/common";
+import DOMPurify from 'dompurify';
 
 export default {
   name: "index",
@@ -261,6 +271,24 @@ export default {
   },
 
   methods: {
+    /**
+     * 使用DOMPurify清理HTML内容，防止XSS攻击
+     * @param {string} html - 原始HTML内容
+     * @returns {string} - 清理后的安全HTML
+     */
+    sanitizeHtml(html) {
+      if (!html) return '';
+      // 如果是纯文本（不包含HTML标签），直接返回
+      if (!/<[^>]+>/.test(html)) {
+        return html;
+      }
+      // 使用DOMPurify清理HTML
+      return DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target'],
+        ALLOW_DATA_ATTR: false
+      });
+    },
     async getPaperAnswerItem(paperAnswerId) {
       const res = await getPaperAnswer(paperAnswerId)
       this.paperDto = res.data.paperDto
@@ -272,6 +300,7 @@ export default {
         this.bindAllAnalysisImages()
         this.bindAllAnswerImages()
         this.setupScrollSpy()
+        this.bindQuestionImagePreview()
       })
     },
     async loadFavoriteQuestionIds() {
@@ -853,6 +882,58 @@ export default {
     //       });
     // },
 
+    // 绑定题干和选项图片预览事件
+    bindQuestionImagePreview() {
+      this.$nextTick(() => {
+        // 绑定题干图片预览和强制尺寸限制
+        const questionTitleElements = document.querySelectorAll('.question-title-content');
+        questionTitleElements.forEach(element => {
+          const images = element.querySelectorAll('img');
+          images.forEach((img, index) => {
+            // 强制设置图片尺寸
+            img.style.maxWidth = '200px';
+            img.style.maxHeight = '200px';
+            img.style.width = 'auto';
+            img.style.height = 'auto';
+            img.style.display = 'inline-block';
+            img.style.cursor = 'zoom-in';
+            img.onclick = (e) => {
+              e.preventDefault();
+              const allImages = Array.from(element.querySelectorAll('img'));
+              const urls = allImages.map(image => image.getAttribute('src')).filter(Boolean);
+              if (urls.length > 0) {
+                const clickedIndex = allImages.indexOf(img);
+                this.openImagePreview(urls, clickedIndex >= 0 ? clickedIndex : 0);
+              }
+            };
+          });
+        });
+
+        // 绑定选项图片预览和强制尺寸限制
+        const optionTextElements = document.querySelectorAll('.option-text');
+        optionTextElements.forEach(element => {
+          const images = element.querySelectorAll('img');
+          images.forEach((img, index) => {
+            // 强制设置选项图片尺寸
+            img.style.maxWidth = '200px';
+            img.style.maxHeight = '200px';
+            img.style.width = 'auto';
+            img.style.height = 'auto';
+            img.style.display = 'inline-block';
+            img.style.cursor = 'zoom-in';
+            img.onclick = (e) => {
+              e.preventDefault();
+              const allImages = Array.from(element.querySelectorAll('img'));
+              const urls = allImages.map(image => image.getAttribute('src')).filter(Boolean);
+              if (urls.length > 0) {
+                const clickedIndex = allImages.indexOf(img);
+                this.openImagePreview(urls, clickedIndex >= 0 ? clickedIndex : 0);
+              }
+            };
+          });
+        });
+      });
+    }
 
   }
   ,
@@ -1020,5 +1101,158 @@ export default {
 }
 ::v-deep .analysis-content p {
   margin: 4px 0;
+}
+
+/* 富文本题干样式 */
+.question-title-content {
+  display: inline;
+  word-break: break-word;
+}
+
+/* 全局强制覆盖题干图片尺寸 */
+.question-title-content >>> img,
+.question-title-content img[src] {
+  max-width: 200px !important;
+  max-height: 200px !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-block !important;
+  margin: 10px 0 !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: zoom-in;
+  transition: transform 0.2s ease;
+}
+
+.question-title-content >>> img:hover {
+  transform: scale(1.02);
+}
+
+/* 确保所有块级元素都内联显示，防止换行 */
+.question-title-content >>> p,
+.question-title-content >>> div,
+.question-title-content >>> h1,
+.question-title-content >>> h2,
+.question-title-content >>> h3,
+.question-title-content >>> h4,
+.question-title-content >>> h5,
+.question-title-content >>> h6 {
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.question-title-content >>> br {
+  display: none !important;
+}
+
+.question-title-content strong {
+  font-weight: bold;
+}
+
+.question-title-content em {
+  font-style: italic;
+}
+
+.question-title-content u {
+  text-decoration: underline;
+}
+
+.question-title-content ol,
+.question-title-content ul {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+.question-title-content code {
+  background-color: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+.question-title-content pre {
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 10px 0;
+}
+
+.question-title-content blockquote {
+  border-left: 4px solid #ddd;
+  padding-left: 10px;
+  margin: 10px 0;
+  color: #666;
+}
+
+/* 选项富文本样式 */
+.option-content {
+  display: inline-flex;
+  align-items: flex-start;
+  word-break: break-word;
+  width: 100%;
+}
+
+.option-prefix {
+  font-weight: bold;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.option-text {
+  flex: 1;
+  display: inline-block;
+}
+
+/* 修复单选框和复选框布局 */
+.el-radio, .el-checkbox {
+  display: flex !important;
+  align-items: flex-start !important;
+  margin-bottom: 12px !important;
+}
+
+.el-radio__input, .el-checkbox__input {
+  margin-top: 2px !important;
+}
+
+.el-radio__label, .el-checkbox__label {
+  flex: 1 !important;
+  padding-left: 8px !important;
+}
+
+.option-text img {
+  max-width: 200px !important;
+  max-height: 200px !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-block !important;
+  margin: 5px 0 !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: zoom-in;
+  transition: transform 0.2s ease;
+  vertical-align: top;
+}
+
+.option-text img:hover {
+  transform: scale(1.02);
+}
+
+.option-text p {
+  display: inline;
+  margin: 0;
+}
+
+.option-text strong {
+  font-weight: bold;
+}
+
+.option-text em {
+  font-style: italic;
+}
+
+.option-text u {
+  text-decoration: underline;
 }
 </style>

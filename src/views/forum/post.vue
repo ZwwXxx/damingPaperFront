@@ -27,7 +27,7 @@
 
           <!-- 帖子内容（富文本编辑器） -->
           <el-form-item label="内容" prop="content">
-            <rich-text-editor
+            <editor
               v-model="formData.content"
               :min-height="300"
               :placeholder="'请输入帖子内容（支持富文本、插入图片）'"
@@ -57,12 +57,12 @@
 
 <script>
 import { addPost, updatePost, getPostDetail } from '@/api/forum'
-import RichTextEditor from '@/components/RichTextEditor.vue'
+import Editor from '@/components/Editor'
 
 export default {
   name: 'ForumPost',
   components: {
-    RichTextEditor
+    Editor
   },
   data() {
     return {

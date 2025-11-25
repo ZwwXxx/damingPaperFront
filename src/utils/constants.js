@@ -3,6 +3,6 @@
  */
 
 // 默认头像URL
-export const DEFAULT_AVATAR = 'https://cdn.zww0891.fun/northern-lights-6862969_1920.jpg'
+export const DEFAULT_AVATAR = 'https://cdn.zww0891.fun/image-20240801110625270.png'
 
 // 其他常量可以在这里添加...

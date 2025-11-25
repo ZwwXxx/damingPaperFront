@@ -39,7 +39,9 @@
            :key="item.favoriteId">
         <div class="flex justify-between items-center border-b pb-2 mb-3">
           <div>
-            <p class="font-semibold text-lg text-gray-800">{{ item.questionTitle || '题目' }}</p>
+            <p class="font-semibold text-lg text-gray-800">
+              <span class="question-title-content" v-html="sanitizeHtml(item.questionTitle || '题目')"></span>
+            </p>
             <p class="text-xs text-gray-500 mt-1">
               试卷：{{ item.paperName || '-' }} ｜ 科目：{{ transferSubject(item.subjectId) }} ｜ 收藏时间：{{ item.createTime || '-' }}
             </p>
@@ -82,6 +84,7 @@
 <script>
 import {getFavoriteDetailList, removeFavorite} from "@/api/questionFavorite";
 import {optionSubject} from "@/api/subject";
+import DOMPurify from 'dompurify';
 
 export default {
   name: "favoriteRecord",
@@ -104,6 +107,20 @@ export default {
     this.getFavoriteList()
   },
   methods: {
+    /**
+     * 使用DOMPurify清理HTML内容，防止XSS攻击
+     */
+    sanitizeHtml(html) {
+      if (!html) return '';
+      if (!/<[^>]+>/.test(html)) {
+        return html;
+      }
+      return DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target'],
+        ALLOW_DATA_ATTR: false
+      });
+    },
     async loadSubjects() {
       const res = await optionSubject()
       const list = res.data || []
@@ -198,6 +215,94 @@ export default {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+/* 富文本题干样式 */
+.question-title-content {
+  display: inline;
+  word-break: break-word;
+}
+
+.question-title-content :deep(img) {
+  max-width: 200px !important;
+  max-height: 200px !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-block !important;
+  margin: 10px 0 !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: zoom-in;
+  transition: transform 0.2s ease;
+}
+
+.question-title-content :deep(img:hover) {
+  transform: scale(1.02);
+}
+
+/* 确保所有块级元素都内联显示，防止换行 */
+.question-title-content :deep(p),
+.question-title-content :deep(div),
+.question-title-content :deep(h1),
+.question-title-content :deep(h2),
+.question-title-content :deep(h3),
+.question-title-content :deep(h4),
+.question-title-content :deep(h5),
+.question-title-content :deep(h6) {
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.question-title-content :deep(br) {
+  display: none !important;
+}
+
+.question-title-content :deep(strong) {
+  font-weight: bold;
+}
+
+.question-title-content :deep(em) {
+  font-style: italic;
+}
+
+.question-title-content :deep(u) {
+  text-decoration: underline;
+}
+
+/* 选项富文本样式 */
+.option-content {
+  display: flex;
+  align-items: flex-start;
+  word-break: break-word;
+}
+
+.option-prefix {
+  font-weight: bold;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.option-text {
+  flex: 1;
+}
+
+.option-text >>> img {
+  max-width: 200px;
+  max-height: 200px;
+  width: auto;
+  height: auto;
+  display: inline-block;
+  margin: 5px 0;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: zoom-in;
+  transition: transform 0.2s ease;
+  vertical-align: top;
+}
+
+.option-text >>> img:hover {
+  transform: scale(1.02);
 }
 </style>
 
