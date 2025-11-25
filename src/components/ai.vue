@@ -151,8 +151,7 @@ export default {
     this.scrollToBottom = debounce(this.performScrollToBottom, 100);
   },
   beforeDestroy() {
-    this.clearTimers();
-    this.clearContext();
+    this.releaseResources();
   },
   methods: {
     performScrollToBottom() {
@@ -335,15 +334,16 @@ export default {
       }, 300); // 短暂延迟以确保用户能感知到文本已完成
     },
 
-    async clearContext() {
-      // 关闭事件源
+    releaseResources() {
       if (this.eventsource) {
         this.eventsource.close();
         this.eventsource = null;
       }
-
-      // 清除所有计时器
       this.clearTimers();
+    },
+
+    async clearContext() {
+      this.releaseResources();
 
       // 发送请求给后端清除会话
       try {

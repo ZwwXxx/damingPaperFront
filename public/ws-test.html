@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket连接测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-box {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #1ac89a;
+            padding-bottom: 10px;
+        }
+        button {
+            background: #1ac89a;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #15a878;
+        }
+        .log {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .log-item {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .success { color: #67C23A; font-weight: bold; }
+        .error { color: #F56C6C; font-weight: bold; }
+        .info { color: #409EFF; }
+        .input-group {
+            margin: 15px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #666;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.connected { background: #67C23A; color: white; }
+        .status.disconnected { background: #F56C6C; color: white; }
+        .status.connecting { background: #E6A23C; color: white; }
+    </style>
+</head>
+<body>
+    <div class="test-box">
+        <h1>🔌 WebSocket连接测试工具</h1>
+        
+        <div class="input-group">
+            <label>WebSocket地址：</label>
+            <input type="text" id="wsUrl" value="ws://127.0.0.1:8080/ws/login" placeholder="ws://127.0.0.1:8080/ws/login">
+        </div>
+        
+        <div>
+            <button onclick="testConnect()">🔗 测试连接</button>
+            <button onclick="sendMessage('request_qrcode')">📱 请求二维码</button>
+            <button onclick="disconnect()">❌ 断开连接</button>
+            <button onclick="clearLog()">🗑️ 清空日志</button>
+            <span id="status" class="status disconnected">未连接</span>
+        </div>
+        
+        <div class="log" id="log">
+            <div class="log-item info">准备测试WebSocket连接...</div>
+            <div class="log-item info">说明：</div>
+            <div class="log-item info">1. 直接连接后端：ws://127.0.0.1:8080/ws/login</div>
+            <div class="log-item info">2. 通过代理连接：ws://localhost:7777/ws/login (需要前端服务启动)</div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        const logDiv = document.getElementById('log');
+        const statusSpan = document.getElementById('status');
+        
+        function log(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const item = document.createElement('div');
+            item.className = `log-item ${type}`;
+            item.textContent = `[${time}] ${message}`;
+            logDiv.appendChild(item);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function updateStatus(text, className) {
+            statusSpan.textContent = text;
+            statusSpan.className = `status ${className}`;
+        }
+        
+        function testConnect() {
+            const url = document.getElementById('wsUrl').value;
+            
+            if (ws) {
+                log('关闭现有连接...', 'info');
+                ws.close();
+            }
+            
+            log(`开始连接: ${url}`, 'info');
+            updateStatus('连接中...', 'connecting');
+            
+            try {
+                ws = new WebSocket(url);
+                
+                ws.onopen = function() {
+                    log('✅ WebSocket连接成功！', 'success');
+                    updateStatus('已连接', 'connected');
+                };
+                
+                ws.onmessage = function(event) {
+                    log(`📨 收到消息: ${event.data}`, 'success');
+                };
+                
+                ws.onerror = function(error) {
+                    log('❌ WebSocket错误: ' + error, 'error');
+                    console.error('WebSocket错误详情:', error);
+                    updateStatus('错误', 'disconnected');
+                };
+                
+                ws.onclose = function(event) {
+                    log(`🔌 连接关闭 - Code: ${event.code}, Reason: ${event.reason || '无'}`, 'info');
+                    updateStatus('未连接', 'disconnected');
+                };
+            } catch (error) {
+                log('❌ 连接失败: ' + error.message, 'error');
+                updateStatus('失败', 'disconnected');
+            }
+        }
+        
+        function sendMessage(msg) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ 未连接，无法发送消息', 'error');
+                return;
+            }
+            
+            log(`📤 发送消息: ${msg}`, 'info');
+            ws.send(msg);
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                log('手动断开连接', 'info');
+            } else {
+                log('当前没有活动连接', 'info');
+            }
+        }
+        
+        function clearLog() {
+            logDiv.innerHTML = '<div class="log-item info">日志已清空</div>';
+        }
+    </script>
+</body>
+</html>

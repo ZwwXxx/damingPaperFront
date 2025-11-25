@@ -5,23 +5,23 @@
     <nav class="bg-gray-800 h-16 fixed w-full z-10  ">
       <div class="container mx-auto h-full flex justify-between items-center p-4">
         <div class="text-white text-lg font-semibold cursor-pointer" @click="goToUrl('/home')">Daming Paper</div>
-        <div class="hidden md:flex space-x-4 flex items-center">
+        <div class="hidden md:flex space-x-4 items-center">
           <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white px-3 py-2">首页</a>
+          <a href="#" @click="goToUrl('/forum/index')" class="block text-gray-300 hover:text-white px-3 py-2">论坛</a>
+          <a href="#" @click="goToUrl('/notice/list')" class="block text-gray-300 hover:text-white px-3 py-2">公告</a>
+          <a href="#" @click="goToUrl('/feedback/submit')" class="block text-gray-300 hover:text-white px-3 py-2">反馈</a>
           <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white px-3 py-2">AI</a>
-          <!-- <a href="#" @click="goToUrl('/person/info')" class="block text-gray-300 hover:text-white px-3 py-2">个人</a> -->
-          <a href="#" class="block px-3 py-2">
-            <div @click="goToUrl('/person/info')">
-              <img :src="avatar" alt="" style="width: 50px;height: 50px;border-radius: 100%">
-            </div>
-          </a>
-          <!-- <a href="#" class="text-white px-3 py-2">
-            {{ name }}
-          </a> -->
-          <a href="#" class="px-3 py-2">
-            <el-button @click="logout" style="height: 40px;">
-              退出登录
-            </el-button>
-          </a>
+          <el-dropdown trigger="hover" @command="handleUserCommand">
+            <span class="avatar-wrapper block px-3 py-2 cursor-pointer text-gray-300 hover:text-white">
+              <img :src="avatar" alt="avatar" class="avatar-img">
+              <i class="el-icon-arrow-down ml-1"></i>
+            </span>
+            <el-dropdown-menu slot="dropdown">
+              <el-dropdown-item command="profile">个人中心</el-dropdown-item>
+              <el-dropdown-item command="feedback">我的反馈</el-dropdown-item>
+              <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
+            </el-dropdown-menu>
+          </el-dropdown>
         </div>
         <div class="md:hidden">
           <button @click="toggleMenu" class="text-white bg-gray-500 p-1 rounded-md focus:outline-none text-2xl "
@@ -35,11 +35,27 @@
       <!-- Mobile Menu -->
       <div v-if="isMenuOpen" id="mobile-menu"
            class="md:hidden bg-gray-800 absolute top-16 left-0 w-full z-30 ">
+        <div class="flex items-center p-4 border-b border-gray-700">
+          <img
+            :src="avatar"
+            alt="avatar"
+            class="w-12 h-12 rounded-full border border-gray-600 cursor-pointer"
+            @click="goToUrl('/person/info')"
+          >
+          <div class="ml-3 flex-1 text-white">
+            <p class="font-semibold">{{ name || '个人中心' }}</p>
+            <p class="text-xs text-gray-300">点击头像进入个人资料</p>
+          </div>
+          <el-button type="primary" size="mini" @click="goToUrl('/person/info')">进入</el-button>
+        </div>
         <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white p-4">首页</a>
-        <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white p-4">关于</a>
-        <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white p-4">服务</a>
-        <a href="#" @click="goToUrl('/person/info')" class="block text-gray-300 hover:text-white p-4">个人</a>
+        <a href="#" @click="goToUrl('/forum/index')" class="block text-gray-300 hover:text-white p-4">论坛</a>
+        <a href="#" @click="goToUrl('/notice/list')" class="block text-gray-300 hover:text-white p-4">公告</a>
+        <a href="#" @click="goToUrl('/feedback/submit')" class="block text-gray-300 hover:text-white p-4">反馈</a>
         <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white p-4">AI</a>
+        <div class="p-4 border-t border-gray-700">
+          <el-button type="danger" size="small" class="w-full" @click="logout">退出登录</el-button>
+        </div>
       </div>
     </transition>
     <!-- 顶部导航栏 end -->
@@ -90,9 +106,30 @@ export default {
 
   methods: {
     async logout() {
-      this.$store.dispatch('LogOut').then(() => {
-        location.href = '/';
-      })
+      this.$confirm('确定要退出登录吗？', '退出确认', {
+        confirmButtonText: '退出',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        this.$store.dispatch('LogOut').then(() => {
+          this.$message.success('退出成功')
+          // 退出后跳转到登录页
+          this.$router.push('/login')
+        }).catch(() => {
+          // 即使退出失败，也跳转到登录页
+          this.$router.push('/login')
+        })
+      }).catch(() => {
+      });
+    },
+    handleUserCommand(command) {
+      if (command === 'profile') {
+        this.goToUrl('/person/info');
+      } else if (command === 'feedback') {
+        this.goToUrl('/feedback/my');
+      } else if (command === 'logout') {
+        this.logout();
+      }
     },
     goToUrl(url) {
       // 同时我们在点击menu菜单跳转时要收缩下拉框
@@ -142,5 +179,17 @@ nav a {
 nav .container {
   padding: 0 1rem;
   height: 100%;
+}
+
+.avatar-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.avatar-img {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.4);
 }
 </style>

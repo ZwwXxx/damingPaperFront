@@ -27,6 +27,12 @@ module.exports = defineConfig({
           ['^' + process.env.VUE_APP_BASE_API]: ''
         }
       },
+      // ⭐ WebSocket代理配置
+      '/ws': {
+        target: 'ws://127.0.0.1:8080',  // 后端WebSocket地址
+        ws: true,  // 启用WebSocket代理
+        changeOrigin: true
+      }
     },
     // disableHostCheck: true
     // disableHostCheck: true 是 Vue CLI 开发服务器中的一个配置选项，以下是对其作用和潜在风险的详细说明：

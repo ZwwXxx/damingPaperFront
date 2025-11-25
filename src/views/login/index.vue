@@ -4,112 +4,1765 @@
 *@date 2024/10/16 10:09
 -->
 <template>
-  <!--大盒子-->
-  <div class=" min-h-screen flex items-center justify-center transition-all duration-1000"
-       :class="isLogin?'bg-gray-500':'bg-green-800'">
-    <!--中间部分-->
-    <div class=" w-96 h-96 rounded-2xl shadow-2xl p-10 transition-all "
-         :class="isLogin?'bg-gray-200':'bg-green-900'"
-    >
-      <div
-          :class="isLogin?'text-gray-600':'text-gray-300'"
-          class="header  font-bold text-3xl text-center mb-10"
-      >
-        <span v-if="isLogin">登录</span>
-        <span v-else>注册</span>
+  <div class="login-container">
+    <!-- 背景装饰 -->
+    <div class="bg-decoration">
+      <!-- 浮动几何图形 -->
+      <div class="floating-shape shape-1"></div>
+      <div class="floating-shape shape-2"></div>
+      <div class="floating-shape shape-3"></div>
+      <div class="floating-shape shape-4"></div>
+      <div class="floating-shape shape-5"></div>
+      
+      <!-- 粒子光点 -->
+      <div class="particle particle-1"></div>
+      <div class="particle particle-2"></div>
+      <div class="particle particle-3"></div>
+      <div class="particle particle-4"></div>
+      <div class="particle particle-5"></div>
+      <div class="particle particle-6"></div>
+      <div class="particle particle-7"></div>
+      <div class="particle particle-8"></div>
+      
+      <!-- 粒子连线画布 -->
+      <canvas id="particleCanvas" class="particle-canvas"></canvas>
+      
+      <!-- 扫描线 -->
+      <div class="scan-line"></div>
+    </div>
+    
+    <!-- 登录卡片容器 -->
+    <div class="login-card">
+      
+      <!-- 左侧：微信扫码登录 -->
+      <div class="qr-section">
+        <div class="qr-content">
+          <div class="icon-wrapper">
+            <i class="el-icon-mobile-phone"></i>
+          </div>
+          <h3 class="qr-title">微信扫码登录</h3>
+          <p class="qr-desc">使用微信扫一扫 快速安全登录</p>
+          
+          <!-- 二维码区域 -->
+          <div class="qr-code-box">
+            <!-- 加载中 -->
+            <div v-if="!qrcodeUrl && !wxLoginError" class="qr-loading">
+              <i class="el-icon-loading"></i>
+              <p>二维码生成中...</p>
+            </div>
+            
+            <!-- 二维码显示（整个区域可点击刷新） -->
+            <div v-show="qrcodeUrl" 
+                 class="qr-code-container" 
+                 :class="{ 'refreshing': wxScanStatus === 'refreshing' }"
+                 @click="refreshQrcode">
+              <canvas ref="qrcodeCanvas"></canvas>
+              
+              <!-- hover时显示刷新遮罩 -->
+              <div v-if="wxScanStatus !== 'scanned'" class="qr-refresh-overlay">
+                <i class="el-icon-refresh-right"></i>
+                <p>点击刷新</p>
+              </div>
+              
+              <!-- 扫码成功遮罩 -->
+              <div v-if="wxScanStatus === 'scanned'" class="qr-scanned-overlay">
+                <i class="el-icon-success"></i>
+                <p>已扫码，请在手机上确认授权</p>
+              </div>
+            </div>
+            
+            <!-- 错误提示 -->
+            <div v-if="wxLoginError" class="qr-error">
+              <i class="el-icon-warning"></i>
+              <p>{{ wxLoginError }}</p>
+              <el-button size="mini" type="primary" @click="retryQrcode">重新获取</el-button>
+            </div>
+          </div>
+          
+          <p class="qr-hint">
+            <span v-if="wxScanStatus === 'refreshing'" class="refresh-tip">
+              <i class="el-icon-loading"></i>
+              正在刷新二维码...
+            </span>
+            <span v-else-if="wxScanStatus === 'scanned'">
+              <!-- 扫码成功提示已在遮罩层显示 -->
+            </span>
+            <span v-else>打开微信扫描二维码 / 点击二维码可刷新</span>
+          </p>
+        </div>
       </div>
 
-      <!--表单区域-->
-      <form @submit.prevent="handleSubmit" class="form-wrapper flex flex-col items-center ">
-        <input
-            v-model="formData.userName"
-            class="w-full p-3 mb-4 rounded-xl shadow-lg  transition-all"
-            required
-            placeholder="请输入用户名"
-        />
-        <input
-            v-model="formData.password"
-            class="w-full p-3 mb-4 rounded-xl shadow-lg  transition-all"
-            required
-            type="password"
-            placeholder="请输入密码"
-        />
-        <button
-            :class="isLogin?' bg-indigo-900':' bg-red-900'"
-            class="w-full text-center rounded-md p-3 text-gray-200 mt-4 shadow-lg">
-          <span v-if="isLogin">登录</span>
-          <span v-else>注册</span>
-        </button>
-      </form>
-      <div class="mt-4 text-sm">
-        <span class="mr-4"
-              :class="isLogin?'text-gray-800':'text-gray-300'"
-        >
-          <span v-if="isLogin">没有账号?</span>
-        <span v-else>已有账号?</span>
-        </span>
+      <!-- 右侧：账号登录 -->
+      <div class="form-section">
+        <!-- 标题 -->
+        <div class="form-header">
+          <h2 class="form-title">欢迎登录</h2>
+          <p class="form-subtitle">刷题系统 · 让学习更高效</p>
+        </div>
 
-        <span
-            :class="isLogin?['hover:text-red-800','text-blue-800']:['hover:text-blue-400','text-red-700']"
-            class="font-bold cursor-pointer  transition-all" @click="changeType"  >
-          <span v-if="isLogin">注册</span>
-          <span v-else>登录</span>
-        </span>
+        <!-- Tab切换 -->
+        <div class="tab-wrapper">
+          <div 
+            @click="activeTab = 'password'"
+            :class="['tab-item', { 'tab-active': activeTab === 'password' }]">
+            <span>密码登录</span>
+          </div>
+          <div 
+            @click="activeTab = 'code'"
+            :class="['tab-item', { 'tab-active': activeTab === 'code' }]">
+            <span>验证码登录</span>
+          </div>
+          <div class="tab-slider" :style="sliderStyle"></div>
+        </div>
+
+        <!-- 表单区域 -->
+        <form @submit.prevent="handleSubmit" class="form-content">
+          <!-- 验证码登录 -->
+          <transition name="fade" mode="out-in">
+            <div v-if="activeTab === 'code'" key="code" class="form-group">
+              <div class="input-group">
+                <label class="input-label">手机号</label>
+                <el-input 
+                  v-model="formData.phone" 
+                  placeholder="请输入手机号"
+                  prefix-icon="el-icon-mobile-phone"
+                  size="large"
+                  class="harmony-input">
+                </el-input>
+              </div>
+              <div class="input-group">
+                <label class="input-label">验证码</label>
+                <div class="code-input-wrapper">
+                  <el-input 
+                    v-model="formData.code" 
+                    placeholder="请输入验证码"
+                    prefix-icon="el-icon-message"
+                    size="large"
+                    class="harmony-input">
+                  </el-input>
+                  <button 
+                    type="button"
+                    class="code-btn"
+                    :disabled="countdown > 0"
+                    @click="sendCode">
+                    {{ countdown > 0 ? `${countdown}s` : '获取验证码' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 密码登录 -->
+            <div v-else key="password" class="form-group">
+              <div class="input-group">
+                <label class="input-label">用户名</label>
+                <el-input 
+                  v-model="formData.userName" 
+                  placeholder="请输入用户名"
+                  prefix-icon="el-icon-user"
+                  size="large"
+                  class="harmony-input">
+                </el-input>
+              </div>
+              <div class="input-group">
+                <label class="input-label">密码</label>
+                <el-input 
+                  v-model="formData.password" 
+                  type="password"
+                  placeholder="请输入密码"
+                  prefix-icon="el-icon-lock"
+                  size="large"
+                  show-password
+                  class="harmony-input">
+                </el-input>
+              </div>
+            </div>
+          </transition>
+
+          <!-- 记住我 & 忘记密码 -->
+          <div class="form-options">
+            <el-checkbox v-model="rememberMe" class="harmony-checkbox">记住我</el-checkbox>
+            <a href="#" class="forgot-link">忘记密码？</a>
+          </div>
+
+          <!-- 登录按钮 -->
+          <button type="submit" class="login-btn">
+            <span>立即登录</span>
+          </button>
+        </form>
+
+        <!-- 注册链接 -->
+        <div class="register-link">
+          还没有账号？
+          <a href="#" @click.prevent="goToRegister">立即注册</a>
+        </div>
       </div>
     </div>
+
+    <!-- 注册对话框 -->
+    <el-dialog
+      title="用户注册"
+      :visible.sync="registerDialogVisible"
+      width="450px"
+      :close-on-click-modal="false"
+      class="register-dialog">
+      <el-form 
+        ref="registerForm" 
+        :model="registerForm" 
+        :rules="registerRules"
+        label-width="80px">
+        <el-form-item label="用户名" prop="userName">
+          <el-input 
+            v-model="registerForm.userName" 
+            placeholder="请输入用户名（4-16位字母数字）"
+            prefix-icon="el-icon-user"
+            maxlength="16"
+            class="harmony-input">
+          </el-input>
+        </el-form-item>
+        
+        <el-form-item label="昵称" prop="nickName">
+          <el-input 
+            v-model="registerForm.nickName" 
+            placeholder="请输入昵称"
+            prefix-icon="el-icon-star-off"
+            maxlength="20"
+            class="harmony-input">
+          </el-input>
+        </el-form-item>
+        
+        <el-form-item label="密码" prop="password">
+          <el-input 
+            v-model="registerForm.password" 
+            type="password"
+            placeholder="请输入密码（6-20位）"
+            prefix-icon="el-icon-lock"
+            show-password
+            maxlength="20"
+            class="harmony-input">
+          </el-input>
+        </el-form-item>
+        
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input 
+            v-model="registerForm.confirmPassword" 
+            type="password"
+            placeholder="请再次输入密码"
+            prefix-icon="el-icon-lock"
+            show-password
+            maxlength="20"
+            class="harmony-input">
+          </el-input>
+        </el-form-item>
+      </el-form>
+      
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="registerDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleRegister" :loading="registerLoading">注册</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import { login, registry} from "@/api/user";
 import {setToken} from "@/utils/auth";
+import QRCode from 'qrcode'
 
 export default {
   name: "index",
-  props: {},
-  components: {},
   data() {
     return {
+      // 当前激活的tab：password-密码登录, code-验证码登录
+      activeTab: 'password',
+      // 表单数据
       formData: {
         userName: '',
         password: '',
+        phone: '',
+        code: ''
       },
-      //判断是登录还是注册
-      isLogin: true
+      // 记住我
+      rememberMe: false,
+      // 验证码倒计时
+      countdown: 0,
+      // 倒计时定时器
+      timer: null,
+      
+      // ========== 微信扫码登录相关 ==========
+      // WebSocket连接
+      websocket: null,
+      // 二维码URL
+      qrcodeUrl: '',
+      // 微信登录错误信息
+      wxLoginError: '',
+      // 微信扫码状态: waiting-待扫码, scanned-已扫码, success-登录成功
+      wxScanStatus: 'waiting',
+      // 登录成功后要跳转的页面（从query获取）
+      redirectUrl: '',
+      
+      // ========== 注册相关 ==========
+      // 注册对话框显示
+      registerDialogVisible: false,
+      // 注册加载状态
+      registerLoading: false,
+      // 注册表单数据
+      registerForm: {
+        userName: '',
+        nickName: '',
+        password: '',
+        confirmPassword: ''
+      },
+      // 注册表单验证规则
+      registerRules: {
+        userName: [
+          { required: true, message: '请输入用户名', trigger: 'blur' },
+          { min: 4, max: 16, message: '用户名长度为4-16位', trigger: 'blur' },
+          { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名只能包含字母、数字和下划线', trigger: 'blur' }
+        ],
+        nickName: [
+          { required: true, message: '请输入昵称', trigger: 'blur' },
+          { min: 2, max: 20, message: '昵称长度为2-20位', trigger: 'blur' }
+        ],
+        password: [
+          { required: true, message: '请输入密码', trigger: 'blur' },
+          { min: 6, max: 20, message: '密码长度为6-20位', trigger: 'blur' }
+        ],
+        confirmPassword: [
+          { required: true, message: '请再次输入密码', trigger: 'blur' },
+          { validator: (rule, value, callback) => {
+            if (value !== this.registerForm.password) {
+              callback(new Error('两次输入的密码不一致'))
+            } else {
+              callback()
+            }
+          }, trigger: 'blur' }
+        ]
+      }
+    }
+  },
+  computed: {
+    // 计算tab滑块位置
+    sliderStyle() {
+      return {
+        transform: this.activeTab === 'password' ? 'translateX(0)' : 'translateX(100%)'
+      }
     }
   },
   methods: {
+    // 提交登录
     async handleSubmit() {
-      if (this.isLogin) {
-        const res = await login(this.formData)
-        if (res.code === 200) {
-          console.log('登录成功!')
-          this.$message.success("登录成功")
-          // cookies设置token
-          setToken(res.token)
-          // store设置token ,info在每次跳转路由时给守卫拦截并发送，达成刷新页面检测cookies 的token重新加载状态store
-          this.$store.commit("SET_TOKEN", res.token)
-          // 跳转首页
-          this.$router.push({path:'/'})
-        }
-        else{
-          this.$message.error("登录失败")
-        }
+      if (this.activeTab === 'password') {
+        // 密码登录
+        await this.loginByPassword()
       } else {
-        const res = await registry(this.formData)
-        if (res.code === 200) {
-          console.log('注册成功')
-        }
+        // 验证码登录
+        await this.loginByCode()
       }
     },
-    changeType() {
-      this.isLogin = !this.isLogin
+    
+    // 密码登录
+    async loginByPassword() {
+      if (!this.formData.userName || !this.formData.password) {
+        this.$message.warning('请输入用户名和密码')
+        return
+      }
+      
+      const res = await login({
+        username: this.formData.userName,  // 后端LoginBody字段是username（小写）
+        password: this.formData.password
+      })
+      
+      if (res.code === 200) {
+        this.$message.success("登录成功")
+        console.log('[Login] 登录响应:', res)
+        console.log('[Login] Token:', res.token)
+        
+        setToken(res.token)
+        this.$store.commit("SET_TOKEN", res.token)
+        
+        // 获取用户信息
+        console.log('[Login] 开始获取用户信息...')
+        const infoRes = await this.$store.dispatch('GetInfo')
+        console.log('[Login] 获取用户信息结果:', infoRes)
+        
+        this.$router.push({path:'/'})
+      } else {
+        this.$message.error(res.msg || "登录失败")
+      }
+    },
+    
+    // 验证码登录（预留接口）
+    async loginByCode() {
+      if (!this.formData.phone || !this.formData.code) {
+        this.$message.warning('请输入手机号和验证码')
+        return
+      }
+      
+      // TODO: 调用验证码登录接口
+      this.$message.info('验证码登录功能开发中...')
+    },
+    
+    // 发送验证码
+    async sendCode() {
+      if (!this.formData.phone) {
+        this.$message.warning('请输入手机号')
+        return
+      }
+      
+      // 手机号格式验证
+      const phoneReg = /^1[3-9]\d{9}$/
+      if (!phoneReg.test(this.formData.phone)) {
+        this.$message.warning('请输入正确的手机号')
+        return
+      }
+      
+      // TODO: 调用发送验证码接口
+      this.$message.success('验证码已发送')
+      
+      // 开始倒计时
+      this.countdown = 60
+      this.timer = setInterval(() => {
+        this.countdown--
+        if (this.countdown <= 0) {
+          clearInterval(this.timer)
+          this.timer = null
+        }
+      }, 1000)
+    },
+    
+    // 打开注册对话框
+    goToRegister() {
+      this.registerDialogVisible = true
+      // 重置表单
+      this.registerForm = {
+        userName: '',
+        nickName: '',
+        password: '',
+        confirmPassword: ''
+      }
+      // 清除验证
+      this.$nextTick(() => {
+        if (this.$refs.registerForm) {
+          this.$refs.registerForm.clearValidate()
+        }
+      })
+    },
+    
+    // 处理注册
+    async handleRegister() {
+      try {
+        // 表单验证
+        await this.$refs.registerForm.validate()
+        
+        this.registerLoading = true
+        
+        // 调用注册接口
+        const res = await registry({
+          userName: this.registerForm.userName,
+          nickName: this.registerForm.nickName,
+          password: this.registerForm.password
+        })
+        
+        if (res.code === 200) {
+          this.$message.success('注册成功！请登录')
+          this.registerDialogVisible = false
+          
+          // 自动填充用户名到登录表单
+          this.formData.userName = this.registerForm.userName
+          this.activeTab = 'password' // 切换到密码登录
+        } else {
+          this.$message.error(res.msg || '注册失败')
+        }
+      } catch (error) {
+        if (error !== false) { // 非表单验证错误
+          console.error('注册失败:', error)
+          this.$message.error('注册失败，请稍后重试')
+        }
+      } finally {
+        this.registerLoading = false
+      }
+    },
+    
+    // ========== 微信扫码登录相关方法 ==========
+    /**
+     * 初始化微信登录
+     */
+    initWxLogin() {
+      try {
+        // ⭐ 开发环境使用相对路径，会经过代理；生产环境使用绝对路径
+        const isDev = process.env.NODE_ENV === 'development'
+        const wsUrl = isDev 
+          ? `ws://${window.location.host}/ws/login`  // 开发环境：通过代理
+          : (process.env.VUE_APP_WS_URL || 'ws://127.0.0.1:8080/ws/login')  // 生产环境：直连
+        
+        console.log('WebSocket连接地址:', wsUrl)
+        this.websocket = new WebSocket(wsUrl)
+        
+        this.websocket.onopen = () => {
+          console.log('WebSocket连接成功')
+          this.wxLoginError = ''
+          // 请求二维码，如果有redirect则携带
+          this.requestQrcode()
+        }
+        
+        this.websocket.onmessage = (event) => {
+          this.handleWxMessage(event.data)
+        }
+        
+        this.websocket.onerror = (error) => {
+          console.error('WebSocket错误:', error)
+          this.wxLoginError = 'WebSocket连接失败，请检查网络'
+        }
+        
+        this.websocket.onclose = () => {
+          console.log('WebSocket连接关闭')
+        }
+      } catch (error) {
+        console.error('初始化WebSocket失败:', error)
+        this.wxLoginError = '初始化失败，请刷新页面重试'
+      }
+    },
+    
+    /**
+     * 请求二维码
+     */
+    requestQrcode() {
+      if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        // 如果有redirect参数，则携带发送给后端
+        if (this.redirectUrl) {
+          console.log('请求二维码 - 携带redirect:', this.redirectUrl)
+          this.websocket.send('request_qrcode:' + this.redirectUrl)
+        } else {
+          console.log('请求二维码 - 不携帧redirect')
+          this.websocket.send('request_qrcode')
+        }
+      } else {
+        this.wxLoginError = 'WebSocket未连接，请刷新页面'
+      }
+    },
+    
+    /**
+     * 处理WebSocket消息
+     */
+    handleWxMessage(message) {
+      console.log('收到消息:', message)
+      
+      // 错误消息
+      if (message.startsWith('ERROR:')) {
+        this.wxLoginError = message.substring(6)
+        return
+      }
+      
+      // ⭐⭐⭐ 登录成功：收到token，直接登录（base模式）
+      if (message.startsWith('SUCCESS:')) {
+        const token = message.substring(8)
+        console.log('✅ 收到token，自动登录')
+        this.$message.success('扫码成功，正在登录...')
+        this.handleWxLoginSuccess(token)
+        return
+      }
+      
+      // 扫码状态通知（userinfo模式）
+      if (message === 'SCANNED') {
+        this.wxScanStatus = 'scanned'
+        this.$message.success('检测到扫码，请在手机上确认授权')
+        return
+      }
+      
+      // 默认认为是二维码URL
+      this.qrcodeUrl = message
+      this.wxScanStatus = 'waiting'
+      this.generateQrcode(message)
+    },
+    
+    /**
+     * 生成二维码
+     */
+    async generateQrcode(url) {
+      try {
+        await this.$nextTick()
+        if (this.$refs.qrcodeCanvas) {
+          await QRCode.toCanvas(this.$refs.qrcodeCanvas, url, {
+            width: 200,
+            margin: 2,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF'
+            }
+          })
+          console.log('二维码生成成功')
+        }
+      } catch (error) {
+        console.error('生成二维码失败:', error)
+        this.wxLoginError = '生成二维码失败'
+      }
+    },
+    
+    /**
+     * 处理微信登录成功
+     */
+    async handleWxLoginSuccess(token) {
+      console.log('微信登录成功 - token:', token)
+      
+      this.wxScanStatus = 'success'
+      this.$message.success('✅ 微信扫码登录成功！正在跳转...')
+      
+      // 保存token
+      setToken(token)
+      this.$store.commit('SET_TOKEN', token)
+      
+      // 关闭WebSocket
+      this.closeWebSocket()
+      
+      try {
+        // 获取用户信息（路由守卫需要）
+        console.log('正在获取用户信息...')
+        const res = await this.$store.dispatch('GetInfo')
+        
+        if (res.code === 200) {
+          console.log('✅ 用户信息获取成功:', res.user)
+          
+          // 延迟跳转
+          setTimeout(() => {
+            if (this.redirectUrl) {
+              console.log('重定向到:', this.redirectUrl)
+              this.$router.push(this.redirectUrl)
+            } else {
+              console.log('跳转到首页')
+              this.$router.push('/')
+            }
+          }, 500)
+        } else {
+          console.error('❌ 获取用户信息失败:', res)
+          this.$message.error('获取用户信息失败，请重新登录')
+        }
+      } catch (error) {
+        console.error('❌ 获取用户信息异常:', error)
+        this.$message.error('登录失败，请重试')
+      }
+    },
+    
+    /**
+     * 关闭WebSocket
+     */
+    closeWebSocket() {
+      if (this.websocket) {
+        this.websocket.close()
+        this.websocket = null
+      }
+    },
+    
+    /**
+     * 刷新二维码（点击二维码时调用）
+     */
+    refreshQrcode() {
+      // 防止频繁点击
+      if (this.wxScanStatus === 'refreshing') {
+        return
+      }
+      
+      console.log('刷新二维码...')
+      this.$message.info('正在刷新二维码...')
+      
+      this.qrcodeUrl = ''
+      this.wxScanStatus = 'refreshing'
+      
+      // 清空canvas
+      const canvas = this.$refs.qrcodeCanvas
+      if (canvas) {
+        const ctx = canvas.getContext('2d')
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+      }
+      
+      if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        // WebSocket连接正常，直接请求新二维码
+        this.requestQrcode()
+      } else {
+        // WebSocket断开，重新建立连接
+        this.initWxLogin()
+      }
+    },
+    
+    /**
+     * 重新获取二维码（错误重试时调用）
+     */
+    retryQrcode() {
+      this.qrcodeUrl = ''
+      this.wxLoginError = ''
+      this.wxScanStatus = 'waiting'
+      
+      if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        this.requestQrcode()
+      } else {
+        this.initWxLogin()
+      }
+    },
+    
+    // 粒子连线效果
+    initParticleCanvas() {
+      const canvas = document.getElementById('particleCanvas')
+      if (!canvas) return
+      
+      const ctx = canvas.getContext('2d')
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+      
+      const drawLines = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        const particles = document.querySelectorAll('.particle')
+        const positions = []
+        
+        particles.forEach(particle => {
+          const rect = particle.getBoundingClientRect()
+          positions.push({
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+          })
+        })
+        
+        // 绘制连线
+        for (let i = 0; i < positions.length; i++) {
+          for (let j = i + 1; j < positions.length; j++) {
+            const dx = positions[i].x - positions[j].x
+            const dy = positions[i].y - positions[j].y
+            const distance = Math.sqrt(dx * dx + dy * dy)
+            
+            if (distance < 300) {
+              const opacity = (1 - distance / 300) * 0.3
+              ctx.strokeStyle = `rgba(26, 200, 154, ${opacity})`
+              ctx.lineWidth = 1
+              ctx.beginPath()
+              ctx.moveTo(positions[i].x, positions[i].y)
+              ctx.lineTo(positions[j].x, positions[j].y)
+              ctx.stroke()
+            }
+          }
+        }
+      }
+      
+      // 每帧更新
+      const animate = () => {
+        drawLines()
+        requestAnimationFrame(animate)
+      }
+      
+      animate()
+      
+      // 窗口大小变化时重绘
+      window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth
+        canvas.height = window.innerHeight
+      })
     }
   },
+  
+  mounted() {
+    // 获取redirect参数
+    this.redirectUrl = this.$route.query.redirect || ''
+    console.log('登录页挂载 - redirect:', this.redirectUrl)
+    
+    // 初始化粒子连线效果
+    this.initParticleCanvas()
+    
+    // ⭐ 初始化WebSocket并请求二维码
+    this.initWxLogin()
+    
+    // 添加鼠标点击波纹效果
+    this.handleClick = (e) => {
+      const ripple = document.createElement('div')
+      ripple.className = 'click-ripple'
+      ripple.style.left = e.clientX + 'px'
+      ripple.style.top = e.clientY + 'px'
+      document.querySelector('.login-container').appendChild(ripple)
+      
+      setTimeout(() => {
+        ripple.remove()
+      }, 1000)
+    }
+    
+    window.addEventListener('click', this.handleClick)
+  },
+  
+  beforeDestroy() {
+    // 清除定时器
+    if (this.timer) {
+      clearInterval(this.timer)
+    }
+    // 移除事件监听
+    if (this.handleClick) {
+      window.removeEventListener('click', this.handleClick)
+    }
+    // ⭐ 关闭WebSocket连接
+    this.closeWebSocket()
+  }
 }
 </script>
 
 <style scoped>
+/* 科技极简风格登录页面 */
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a0a;
+  position: relative;
+  overflow: hidden;
+}
 
+/* 背景装饰容器 */
+.bg-decoration {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
 
+/* 粒子连线画布 */
+.particle-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 扫描线 */
+.scan-line {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(26, 200, 154, 0.8) 50%, 
+    transparent 100%);
+  box-shadow: 0 0 10px rgba(26, 200, 154, 0.8);
+  animation: scan 8s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes scan {
+  0% { top: 0; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* 背景网格效果 */
+.bg-decoration::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(rgba(34, 230, 168, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 230, 168, 0.02) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: gridMove 20s linear infinite;
+}
+
+.bg-decoration::after {
+  content: '';
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  top: -300px;
+  right: -300px;
+  background: radial-gradient(circle, rgba(34, 230, 168, 0.05) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: pulse 8s ease-in-out infinite;
+}
+
+@keyframes gridMove {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(50px); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+/* 浮动几何图形 */
+.floating-shape {
+  position: absolute;
+  border: 2px solid rgba(26, 200, 154, 0.15);
+  background: rgba(26, 200, 154, 0.03);
+  backdrop-filter: blur(5px);
+  pointer-events: none;
+}
+
+.shape-1 {
+  width: 150px;
+  height: 150px;
+  border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+  top: 10%;
+  left: 8%;
+  animation: float1 18s ease-in-out infinite;
+}
+
+.shape-2 {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  top: 60%;
+  left: 15%;
+  animation: float2 15s ease-in-out infinite;
+}
+
+.shape-3 {
+  width: 120px;
+  height: 120px;
+  border-radius: 20px;
+  top: 20%;
+  right: 12%;
+  animation: float3 20s ease-in-out infinite;
+}
+
+.shape-4 {
+  width: 80px;
+  height: 80px;
+  border-radius: 50% 0;
+  bottom: 15%;
+  right: 20%;
+  animation: float4 16s ease-in-out infinite;
+}
+
+.shape-5 {
+  width: 60px;
+  height: 60px;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  bottom: 25%;
+  left: 25%;
+  animation: float5 14s ease-in-out infinite;
+}
+
+/* 粒子光点 */
+.particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(26, 200, 154, 0.8);
+  box-shadow: 0 0 15px rgba(26, 200, 154, 1);
+  pointer-events: none;
+  opacity: 0.8;
+  animation: particlePulse 3s ease-in-out infinite;
+}
+
+/* 粒子呼吸动画 */
+@keyframes particlePulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 15px rgba(26, 200, 154, 1);
+  }
+  50% {
+    transform: scale(2);
+    box-shadow: 0 0 30px rgba(26, 200, 154, 1);
+  }
+}
+
+.particle-1 { top: 15%; left: 20%; animation-delay: 0s; }
+.particle-2 { top: 25%; left: 80%; animation-delay: 0.4s; }
+.particle-3 { top: 45%; left: 10%; animation-delay: 0.8s; }
+.particle-4 { top: 55%; left: 85%; animation-delay: 1.2s; }
+.particle-5 { top: 70%; left: 30%; animation-delay: 1.6s; }
+.particle-6 { top: 80%; left: 75%; animation-delay: 2.0s; }
+.particle-7 { top: 35%; left: 50%; animation-delay: 2.4s; }
+.particle-8 { top: 65%; left: 60%; animation-delay: 2.8s; }
+
+/* 浮动动画 - 增大幅度 */
+@keyframes float1 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  33% { transform: translate(60px, -40px) rotate(120deg) scale(1.1); }
+  66% { transform: translate(-40px, 60px) rotate(240deg) scale(0.9); }
+}
+
+@keyframes float2 {
+  0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  50% { transform: translate(-80px, 80px) scale(1.3) rotate(180deg); }
+}
+
+@keyframes float3 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  33% { transform: translate(-50px, 70px) rotate(120deg) scale(1.15); }
+  66% { transform: translate(70px, -50px) rotate(240deg) scale(0.85); }
+}
+
+@keyframes float4 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate(60px, -60px) rotate(180deg) scale(1.2); }
+}
+
+@keyframes float5 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  25% { transform: translate(50px, 50px) rotate(90deg) scale(1.1); }
+  50% { transform: translate(-50px, 50px) rotate(180deg) scale(0.9); }
+  75% { transform: translate(-50px, -50px) rotate(270deg) scale(1.1); }
+}
+
+/* 闪烁动画 */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.5); }
+}
+
+/* 点击波纹效果 */
+.click-ripple {
+  position: fixed;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(26, 200, 154, 0.6) 0%, transparent 70%);
+  transform: translate(-50%, -50%);
+  animation: ripple 1s ease-out;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+@keyframes ripple {
+  0% {
+    width: 20px;
+    height: 20px;
+    opacity: 1;
+  }
+  100% {
+    width: 200px;
+    height: 200px;
+    opacity: 0;
+  }
+}
+
+/* 登录卡片 */
+.login-card {
+  width: 920px;
+  height: 580px;
+  background: rgba(15, 15, 15, 0.8);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  border: 1px solid rgba(26, 200, 154, 0.15);
+  box-shadow: 
+    0 8px 32px rgba(26, 200, 154, 0.2),
+    0 0 60px rgba(26, 200, 154, 0.15);
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  animation: slideUp 0.6s ease-out, breathe 4s ease-in-out infinite;
+}
+
+/* 呼吸发光动画 */
+@keyframes breathe {
+  0%, 100% {
+    box-shadow: 
+      0 8px 32px rgba(26, 200, 154, 0.2),
+      0 0 60px rgba(26, 200, 154, 0.15);
+  }
+  50% {
+    box-shadow: 
+      0 8px 32px rgba(26, 200, 154, 0.4),
+      0 0 80px rgba(26, 200, 154, 0.3);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 左侧二维码区域 */
+.qr-section {
+  width: 38%;
+  background: linear-gradient(135deg, #1ac89a 0%, #15a878 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 0 100px rgba(26, 200, 154, 0.3);
+}
+
+.qr-section::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: 
+    linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.03) 50%, transparent 55%);
+  background-size: 40px 40px;
+  animation: scan 3s linear infinite;
+}
+
+@keyframes scan {
+  from { transform: translateX(-40px); }
+  to { transform: translateX(40px); }
+}
+
+.qr-content {
+  text-align: center;
+  color: white;
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 20px;
+}
+
+.icon-wrapper {
+  width: 60px;
+  height: 60px;
+  margin: 16px auto 16px;
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(10px);
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+}
+
+.icon-wrapper:hover {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.qr-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+}
+
+.qr-desc {
+  font-size: 13px;
+  opacity: 0.9;
+  margin-bottom: 20px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.qr-code-box {
+  width: 200px;
+  height: 200px;
+  margin: 0 auto 16px;
+  background: white;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.15),
+    0 0 40px rgba(26, 200, 154, 0.4);
+}
+
+.qr-loading {
+  text-align: center;
+  color: rgba(34, 230, 168, 0.5);
+}
+
+.qr-loading i {
+  font-size: 36px;
+  margin-bottom: 8px;
+  display: block;
+  color: #1ac89a;
+  filter: drop-shadow(0 0 8px rgba(26, 200, 154, 0.5));
+}
+
+.qr-loading p {
+  font-size: 12px;
+  color: #666;
+}
+
+/* 二维码错误提示 */
+.qr-error {
+  text-align: center;
+  color: #F56C6C;
+  padding: 20px;
+}
+
+.qr-error i {
+  font-size: 36px;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.qr-error p {
+  font-size: 13px;
+  margin-bottom: 15px;
+  color: #666;
+}
+
+/* 二维码容器（可点击） */
+.qr-code-container {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: 0 auto;
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.qr-code-container:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(26, 200, 154, 0.3);
+}
+
+/* 刷新中时禁用hover效果 */
+.qr-code-container.refreshing {
+  cursor: not-allowed;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.qr-code-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 刷新遮罩层（hover时显示） */
+.qr-refresh-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  color: white;
+}
+
+.qr-code-container:hover .qr-refresh-overlay {
+  opacity: 1;
+}
+
+.qr-refresh-overlay i {
+  font-size: 32px;
+  margin-bottom: 8px;
+  animation: rotate-refresh 2s linear infinite;
+}
+
+.qr-refresh-overlay p {
+  font-size: 14px;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* 刷新图标旋转动画 */
+@keyframes rotate-refresh {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 扫码成功遮罩层（黑色半透明） */
+.qr-scanned-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  animation: fadeIn 0.3s ease;
+}
+
+.qr-scanned-overlay i {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: #67C23A;
+  animation: scaleIn 0.5s ease;
+}
+
+.qr-scanned-overlay p {
+  font-size: 13px;
+  margin: 0;
+  font-weight: 400;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* 遮罩淡入动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 图标缩放动画 */
+@keyframes scaleIn {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.qr-hint {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+/* 扫码成功提示 */
+.scan-tip {
+  color: #67C23A;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.scan-tip i {
+  font-size: 14px;
+}
+
+/* 刷新中提示 */
+.refresh-tip {
+  color: #409EFF;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.refresh-tip i {
+  font-size: 14px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* 右侧表单区域 */
+.form-section {
+  flex: 1;
+  padding: 50px 60px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 40, 30, 0.6);
+}
+
+.form-header {
+  margin-bottom: 40px;
+}
+
+.form-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #1ac89a;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+  text-shadow: 0 0 30px rgba(26, 200, 154, 0.4);
+}
+
+.form-subtitle {
+  font-size: 14px;
+  color: rgba(34, 230, 168, 0.7);
+}
+
+/* Tab切换 */
+.tab-wrapper {
+  display: flex;
+  position: relative;
+  margin-bottom: 32px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  padding: 3px;
+  border: 1px solid rgba(34, 230, 168, 0.08);
+}
+
+.tab-item {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 1;
+  font-weight: 500;
+  color: rgba(34, 230, 168, 0.6);
+  font-size: 15px;
+}
+
+.tab-item span {
+  position: relative;
+  z-index: 2;
+}
+
+.tab-active {
+  color: #0a0a0a;
+}
+
+.tab-slider {
+  position: absolute;
+  height: calc(100% - 6px);
+  width: calc(50% - 3px);
+  background: linear-gradient(135deg, #1ac89a 0%, #15a878 100%);
+  border-radius: 10px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    0 0 20px rgba(26, 200, 154, 0.4),
+    0 0 40px rgba(26, 200, 154, 0.2);
+  top: 3px;
+  left: 3px;
+}
+
+/* 表单内容 */
+.form-content {
+  flex: 1;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.input-label {
+  font-size: 13px;
+  color: rgba(34, 230, 168, 0.85);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+/* 输入框样式 */
+.harmony-input >>> .el-input__inner {
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid rgba(26, 200, 154, 0.15);
+  background: rgba(0, 0, 0, 0.3);
+  color: #1ac89a;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  padding-left: 45px;
+}
+
+.harmony-input >>> .el-input__inner:focus {
+  border-color: #1ac89a;
+  background: rgba(0, 0, 0, 0.5);
+  box-shadow: 
+    0 0 0 3px rgba(26, 200, 154, 0.08),
+    0 0 20px rgba(26, 200, 154, 0.2);
+}
+
+.harmony-input >>> .el-input__inner::placeholder {
+  color: rgba(34, 230, 168, 0.4);
+}
+
+.harmony-input >>> .el-input__prefix {
+  color: rgba(34, 230, 168, 0.6);
+}
+
+.code-input-wrapper {
+  display: flex;
+  gap: 12px;
+}
+
+.code-btn {
+  min-width: 110px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1ac89a 0%, #15a878 100%);
+  color: #0a0a0a;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 20px rgba(26, 200, 154, 0.3);
+}
+
+.code-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 20px rgba(26, 200, 154, 0.4),
+    0 0 30px rgba(26, 200, 154, 0.3);
+}
+
+.code-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 表单选项 */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0;
+  font-size: 13px;
+}
+
+.harmony-checkbox >>> .el-checkbox__label {
+  color: rgba(34, 230, 168, 0.75);
+}
+
+.harmony-checkbox >>> .el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: #1ac89a;
+  border-color: #1ac89a;
+  box-shadow: 0 0 10px rgba(26, 200, 154, 0.5);
+}
+
+.harmony-checkbox >>> .el-checkbox__inner {
+  border-color: rgba(26, 200, 154, 0.25);
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.harmony-checkbox >>> .el-checkbox__inner:hover {
+  border-color: #1ac89a;
+}
+
+.forgot-link {
+  color: rgba(34, 230, 168, 0.75);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.forgot-link:hover {
+  color: #1ac89a;
+  text-shadow: 0 0 10px rgba(26, 200, 154, 0.5);
+}
+
+/* 登录按钮 */
+.login-btn {
+  width: 100%;
+  height: 52px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1ac89a 0%, #15a878 100%);
+  color: #0a0a0a;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  transition: all 0.4s ease;
+  box-shadow: 
+    0 0 30px rgba(26, 200, 154, 0.4),
+    0 0 50px rgba(26, 200, 154, 0.2);
+  margin-top: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s;
+}
+
+.login-btn:hover::before {
+  left: 100%;
+}
+
+.login-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 
+    0 0 40px rgba(26, 200, 154, 0.6),
+    0 0 60px rgba(26, 200, 154, 0.3);
+}
+
+.login-btn:active {
+  transform: translateY(-1px);
+}
+
+/* 注册链接 */
+.register-link {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 14px;
+  color: rgba(34, 230, 168, 0.6);
+}
+
+.register-link a {
+  color: #1ac89a;
+  text-decoration: none;
+  font-weight: 600;
+  margin-left: 4px;
+  transition: color 0.3s ease;
+}
+
+.register-link a:hover {
+  color: #22e6a8;
+  text-shadow: 0 0 15px rgba(26, 200, 154, 0.6);
+}
+
+/* 过渡动画 */
+.fade-enter-active, .fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.fade-enter, .fade-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+/* 响应式 */
+@media (max-width: 1024px) {
+  .login-card {
+    width: 90%;
+    max-width: 800px;
+  }
+}
+
+/* ========== 注册对话框样式 ========== */
+.register-dialog >>> .el-dialog {
+  background: linear-gradient(135deg, rgba(15, 15, 15, 0.98) 0%, rgba(10, 10, 10, 0.98) 100%);
+  border: 1px solid rgba(26, 200, 154, 0.2);
+  border-radius: 16px;
+  box-shadow: 
+    0 8px 32px rgba(26, 200, 154, 0.25),
+    0 0 60px rgba(26, 200, 154, 0.15);
+  backdrop-filter: blur(20px);
+}
+
+.register-dialog >>> .el-dialog__header {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid rgba(26, 200, 154, 0.1);
+}
+
+.register-dialog >>> .el-dialog__title {
+  color: #1ac89a;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.register-dialog >>> .el-dialog__headerbtn .el-dialog__close {
+  color: rgba(34, 230, 168, 0.6);
+  font-size: 20px;
+  transition: all 0.3s ease;
+}
+
+.register-dialog >>> .el-dialog__headerbtn .el-dialog__close:hover {
+  color: #1ac89a;
+  transform: rotate(90deg);
+}
+
+.register-dialog >>> .el-dialog__body {
+  padding: 24px;
+}
+
+.register-dialog >>> .el-form-item {
+  margin-bottom: 30px;
+  position: relative;
+}
+
+.register-dialog >>> .el-form-item__label {
+  color: rgba(34, 230, 168, 0.85);
+  font-weight: 500;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.register-dialog >>> .el-form-item__error {
+  color: #ff6b9d;
+  font-size: 12px;
+  position: absolute;
+  bottom: -22px;
+  left: 2px;
+  line-height: 1;
+}
+
+.register-dialog >>> .el-dialog__footer {
+  padding: 16px 24px 24px;
+  border-top: 1px solid rgba(26, 200, 154, 0.1);
+}
+
+.register-dialog >>> .dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.register-dialog >>> .el-button {
+  height: 42px;
+  padding: 0 28px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.register-dialog >>> .el-button--default {
+  background: rgba(26, 200, 154, 0.1);
+  border: 1px solid rgba(26, 200, 154, 0.2);
+  color: #1ac89a;
+}
+
+.register-dialog >>> .el-button--default:hover {
+  background: rgba(26, 200, 154, 0.15);
+  border-color: #1ac89a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(26, 200, 154, 0.2);
+}
+
+.register-dialog >>> .el-button--primary {
+  background: linear-gradient(135deg, #1ac89a 0%, #15a878 100%);
+  border: none;
+  color: #0a0a0a;
+  font-weight: 600;
+  box-shadow: 
+    0 4px 12px rgba(26, 200, 154, 0.3),
+    0 0 20px rgba(26, 200, 154, 0.2);
+}
+
+.register-dialog >>> .el-button--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 6px 20px rgba(26, 200, 154, 0.4),
+    0 0 30px rgba(26, 200, 154, 0.3);
+}
+
+.register-dialog >>> .el-button--primary.is-loading {
+  opacity: 0.8;
+}
 </style>

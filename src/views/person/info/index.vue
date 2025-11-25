@@ -46,11 +46,15 @@
 <script>
 // import Wrapper from "@/components/wrapper.vue";
 import store from "@/store";
-import { updateInfo} from "@/api/user";
+import { updateInfo, uploadFile } from "@/api/user";
+import { convertAvatarUrl } from "@/utils/oss";
+import { DEFAULT_AVATAR } from "@/utils/constants";
 
 export default {
   name: "index",
-  created() {
+  async created() {
+    // 先获取最新的用户信息
+    await this.loadUserInfo()
   },
   props: {},
   // components: {Wrapper},
@@ -58,20 +62,47 @@ export default {
     return {
       // 是否显示cropper
       form: {
-        userName:this.$store.state.user.id,
-        nickName:this.$store.state.user.name,
+        userName: this.$store.state.user.userName || '',  // 登录名（zww）
+        nickName: this.$store.state.user.nickName || '',   // 显示名（6666）
       },
       rules: {
         nickName: [{required: true, message: '请输入昵称', trigger: 'blur'}]
       },
       //后续想搞裁剪再来
       options: {
-        img:  store.getters.avatar
+        img: ''  // 在created中异步加载签名URL
       },
       blob: '' //file文件 二进制
     }
   },
   methods: {
+    /**
+     * 加载用户信息并初始化头像
+     */
+    async loadUserInfo() {
+      try {
+        // 先获取最新的用户信息
+        await store.dispatch('GetInfo')
+        
+        // 更新表单数据
+        this.form.userName = store.getters.userName  // 登录名（zww）
+        this.form.nickName = store.getters.nickName  // 显示名（6666）
+        
+        // 获取头像URL（后端已返回完整的CDN地址）
+        const avatarUrl = store.getters.avatar
+        console.log('加载的头像URL:', avatarUrl)
+        
+        if (avatarUrl && avatarUrl !== DEFAULT_AVATAR) {
+          this.options.img = avatarUrl
+        } else {
+          // 没有头像时使用默认头像
+          this.options.img = DEFAULT_AVATAR
+        }
+      } catch (error) {
+        console.error('加载用户信息失败:', error)
+        this.options.img = DEFAULT_AVATAR
+      }
+    },
     // 覆盖默认的上传行为
     requestUpload() {
     },
@@ -101,31 +132,61 @@ export default {
         })
       }
     },
-    handleSubmit() {
+    async handleSubmit() {
       // 在这里可以处理表单提交逻辑
-      this.$refs['form'].validate((valid) => {
-        if (valid) {
-          const formData = new FormData;
-          if (this.blob) {
-            formData.append("avatarfile", this.blob, this.options.filename);
+      try {
+        await this.$refs['form'].validate()
+      } catch {
+        this.$message.error("请确认信息是否填写完毕")
+        return
+      }
+      
+      try {
+        let avatarUrl = null
+        
+        // 如果选择了新头像，先上传到OSS
+        if (this.blob) {
+          // this.$message.info('正在上传头像...')
+          const formData = new FormData()
+          formData.append("file", this.blob, this.options.filename)
+          
+          const uploadRes = await uploadFile(formData)
+          if (uploadRes.code === 200) {
+            avatarUrl = uploadRes.url  // 使用url字段获取完整CDN地址
+            console.log('头像上传成功:', avatarUrl)
+          } else {
+            this.$message.error('头像上传失败')
+            return
           }
-          // 将对象转换为 JSON 字符串
-          formData.append("userForm", JSON.stringify(this.form));
-          updateInfo(formData).then(res => {
-            if (res.code === 200) {
-              this.$message.success('修改成功！')
-              this.options.img = process.env.VUE_APP_BASE_API + res.imgUrl;
-              console.log(this.options.img)
-              store.commit('SET_AVATAR', this.options.img);
-            } else {
-              this.$message.error("修改失败！请确认信息是否填写完毕")
-            }
-          })
-        } else {
-          this.$message.error("请确认信息是否填写完毕")
-          return false;
         }
-      });
+        
+        // 准备更新数据（JSON格式）
+        const updateData = {
+          nickName: this.form.nickName
+        }
+        
+        // 如果上传了新头像，添加到更新数据中
+        if (avatarUrl) {
+          updateData.avatar = avatarUrl
+        }
+        
+        console.log('准备更新的数据:', updateData)
+        
+        // 调用更新接口
+        const res = await updateInfo(updateData)
+        console.log('更新接口返回:', res)
+        if (res.code === 200) {
+          this.$message.success('修改成功！')
+          
+          // 刷新用户信息和头像显示
+          await this.loadUserInfo()
+        } else {
+          this.$message.error(res.msg || "修改失败！")
+        }
+      } catch (error) {
+        console.error('更新失败:', error)
+        this.$message.error("修改失败！")
+      }
     }
   },
 }

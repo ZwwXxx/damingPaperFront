@@ -37,6 +37,26 @@ const routes = [
                         path: 'record',
                         name: 'record',
                         component: () => import('@/views/person/record/index.vue'),
+                    },
+                    {
+                        path: 'wrong',
+                        name: 'wrong',
+                        component: () => import('@/views/person/wrong/index.vue'),
+                    },
+                    {
+                        path: 'favorite',
+                        name: 'favorite',
+                        component: () => import('@/views/person/favorite/index.vue'),
+                    },
+                    {
+                        path: 'posts',
+                        name: 'posts',
+                        component: () => import('@/views/person/posts/index.vue'),
+                    },
+                    {
+                        path: 'dashboard',
+                        name: 'dashboard',
+                        component: () => import('@/views/dashboard/personal.vue'),
                     }
                 ]
             },
@@ -49,8 +69,37 @@ const routes = [
                 path: '/ai',
                 name: 'ai',
                 component: () => import('@/components/ai.vue'),
+            },
+            {
+                path: '/notice/list',
+                name: 'noticeList',
+                component: () => import('@/views/notice/list.vue'),
+            },
+            {
+                path: '/feedback/submit',
+                name: 'feedbackSubmit',
+                component: () => import('@/views/feedback/submit.vue'),
+            },
+            {
+                path: '/feedback/my',
+                name: 'feedbackMy',
+                component: () => import('@/views/feedback/my.vue'),
+            },
+            {
+                path: '/forum/index',
+                name: 'forumIndex',
+                component: () => import('@/views/forum/index.vue'),
+            },
+            {
+                path: '/forum/detail/:id',
+                name: 'forumDetail',
+                component: () => import('@/views/forum/detail.vue'),
+            },
+            {
+                path: '/forum/post',
+                name: 'forumPost',
+                component: () => import('@/views/forum/post.vue'),
             }
-
 
         ],
     },
