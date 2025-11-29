@@ -8,188 +8,206 @@
         </div>
       </div>
 
-      <el-form ref="publishForm" :model="form" :rules="rules" label-width="100px" class="publish-form">
-        <!-- 基础信息 -->
-        <div class="form-section">
-          <h3 class="section-title">📋 基础信息</h3>
-          
-          <el-form-item label="知识点标题" prop="title">
-            <el-input
-              v-model="form.title"
-              placeholder="请输入知识点标题（建议简洁明了）"
-              maxlength="100"
-              show-word-limit
-            />
-          </el-form-item>
+      <el-form ref="publishForm" :model="form" :rules="rules" class="publish-form">
+        <div class="publish-layout">
+          <!-- 左侧：Markdown 编辑器 -->
+          <div class="editor-container">
+            <div class="editor-wrapper">
+              <div class="markdown-editor">
+                <div class="editor-toolbar">
+                  <div class="toolbar-groups">
+                    <!-- 文本格式 -->
+                    <el-button-group size="small">
+                      <el-button @click="insertMarkdown('**', '**')" title="加粗">
+                        <strong>B</strong>
+                      </el-button>
+                      <el-button @click="insertMarkdown('*', '*')" title="斜体">
+                        <em>I</em>
+                      </el-button>
+                      <el-button @click="insertMarkdown('# ', '')" title="标题">
+                        <strong>H</strong>
+                      </el-button>
+                      <el-button @click="insertMarkdown('~~', '~~')" title="删除线">
+                        <span style="text-decoration: line-through;">S</span>
+                      </el-button>
+                    </el-button-group>
 
-          <el-form-item label="科目" prop="subjectId">
-            <el-select v-model="form.subjectId" placeholder="请选择科目" @change="handleSubjectChange">
-              <el-option
-                v-for="subject in subjectList"
-                :key="subject.subjectId"
-                :label="subject.subjectName"
-                :value="subject.subjectId"
-              />
-            </el-select>
-          </el-form-item>
+                    <!-- 列表 -->
+                    <el-button-group size="small">
+                      <el-button @click="insertMarkdown('- ', '')" title="无序列表">
+                        <i class="el-icon-menu"></i>
+                      </el-button>
+                      <el-button @click="insertMarkdown('1. ', '')" title="有序列表">
+                        <i class="el-icon-finished"></i>
+                      </el-button>
+                      <el-button @click="insertMarkdown('- [ ] ', '')" title="任务列表">
+                        <i class="el-icon-circle-check"></i>
+                      </el-button>
+                    </el-button-group>
 
-          <el-form-item label="章节" prop="chapterId">
-            <el-select
-              v-model="form.chapterId"
-              placeholder="请选择章节"
-              :disabled="!form.subjectId"
-            >
-              <el-option
-                v-for="chapter in chapterList"
-                :key="chapter.chapterId"
-                :label="chapter.chapterName"
-                :value="chapter.chapterId"
-              />
-            </el-select>
-          </el-form-item>
+                    <!-- 引用和代码 -->
+                    <el-button-group size="small">
+                      <el-button @click="insertMarkdown('> ', '')" title="引用">
+                        <i class="el-icon-chat-line-round"></i>
+                      </el-button>
+                      <el-button @click="insertMarkdown('`', '`')" title="行内代码">
+                        <i class="el-icon-collection-tag"></i>
+                      </el-button>
+                      <el-button @click="insertCodeBlock" title="代码块">
+                        <i class="el-icon-document-copy"></i>
+                      </el-button>
+                    </el-button-group>
 
-          <el-form-item label="难度等级" prop="difficulty">
-            <el-select v-model="form.difficulty" placeholder="请选择难度等级">
-              <el-option label="入门" value="1" />
-              <el-option label="初级" value="2" />
-              <el-option label="中级" value="3" />
-              <el-option label="高级" value="4" />
-              <el-option label="专家" value="5" />
-            </el-select>
-          </el-form-item>
-        </div>
+                    <!-- 媒体和链接 -->
+                    <el-button-group size="small">
+                      <el-button @click="insertMarkdown('![图片描述](', ')')" title="图片">
+                        <i class="el-icon-picture"></i>
+                      </el-button>
+                      <el-button @click="insertMarkdown('[链接文字](', ')')" title="链接">
+                        <i class="el-icon-link"></i>
+                      </el-button>
+                      <el-button @click="insertTable" title="表格">
+                        <i class="el-icon-s-grid"></i>
+                      </el-button>
+                    </el-button-group>
 
-        <!-- 内容摘要 -->
-        <div class="form-section">
-          <h3 class="section-title">📝 内容摘要</h3>
-          <el-form-item label="摘要" prop="summary">
-            <el-input
-              type="textarea"
-              v-model="form.summary"
-              placeholder="请简要描述知识点内容（100-300字）"
-              :rows="4"
-              maxlength="300"
-              show-word-limit
-            />
-          </el-form-item>
-        </div>
+                    <!-- 其他 -->
+                    <el-button-group size="small">
+                      <el-button @click="insertMarkdown('---\n', '')" title="分隔线">
+                        <i class="el-icon-minus"></i>
+                      </el-button>
+                      <el-button @click="insertMarkdown('==', '==')" title="高亮">
+                        <i class="el-icon-star-on"></i>
+                      </el-button>
+                    </el-button-group>
+                  </div>
+                  
+                  <span class="toolbar-tip">实时预览</span>
+                </div>
 
-        <!-- Markdown 内容编辑器 -->
-        <div class="form-section">
-          <h3 class="section-title">📖 详细内容</h3>
-          <el-form-item label="详细内容" prop="content">
-            <div class="markdown-editor">
-              <div class="editor-toolbar">
-                <el-button-group size="small">
-                  <el-button @click="insertMarkdown('**', '**')" title="加粗">
-                    <i class="el-icon-bold"></i>
-                  </el-button>
-                  <el-button @click="insertMarkdown('*', '*')" title="斜体">
-                    <i class="el-icon-italic"></i>
-                  </el-button>
-                  <el-button @click="insertMarkdown('`', '`')" title="行内代码">
-                    <i class="el-icon-collection-tag"></i>
-                  </el-button>
-                  <el-button @click="insertMarkdown('```\n', '\n```')" title="代码块">
-                    <i class="el-icon-document-copy"></i>
-                  </el-button>
-                  <el-button @click="insertMarkdown('> ', '')" title="引用">
-                    <i class="el-icon-chat-line-round"></i>
-                  </el-button>
-                  <el-button @click="insertMarkdown('- ', '')" title="列表">
-                    <i class="el-icon-menu"></i>
-                  </el-button>
-                  <el-button @click="insertMarkdown('[链接文字](', ')')" title="链接">
-                    <i class="el-icon-link"></i>
-                  </el-button>
-                </el-button-group>
-                
-                <div class="editor-tabs">
-                  <span 
-                    :class="['tab-item', { active: activeTab === 'edit' }]"
-                    @click="activeTab = 'edit'"
-                  >
-                    编辑
-                  </span>
-                  <span 
-                    :class="['tab-item', { active: activeTab === 'preview' }]"
-                    @click="activeTab = 'preview'"
-                  >
-                    预览
-                  </span>
+                <!-- 编辑和预览并排显示 -->
+                <div class="editor-preview-container">
+                  <!-- 编辑区域 -->
+                  <div class="editor-area">
+                    <div class="area-header">编辑</div>
+                    <el-input
+                      ref="contentEditor"
+                      type="textarea"
+                      v-model="form.content"
+                      placeholder="请使用 Markdown 语法编写知识点详细内容..."
+                      class="markdown-textarea"
+                    />
+                  </div>
+
+                  <!-- 预览区域 -->
+                  <div class="preview-area">
+                    <div class="area-header">预览</div>
+                    <div class="preview-content" ref="previewContent">
+                      <v-md-preview 
+                        :text="form.content || '开始输入，实时查看预览效果'"
+                        @copy-code-success="handleCopySuccess"
+                        class="md-preview-content"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
+            </div>
+          </div>
 
-              <!-- 编辑区域 -->
-              <div v-show="activeTab === 'edit'" class="editor-area">
+          <!-- 右侧：发布设置 -->
+          <div class="settings-container">
+            <div class="settings-wrapper">
+              <h3 class="settings-title">发布设置</h3>
+              
+              <el-form-item label="标题" prop="title">
                 <el-input
-                  ref="contentEditor"
-                  type="textarea"
-                  v-model="form.content"
-                  placeholder="请使用 Markdown 语法编写知识点详细内容..."
-                  :rows="20"
-                  class="markdown-textarea"
+                  v-model="form.title"
+                  placeholder="请输入知识点标题"
+                  maxlength="100"
+                  show-word-limit
                 />
-              </div>
+              </el-form-item>
 
-              <!-- 预览区域 -->
-              <div v-show="activeTab === 'preview'" class="preview-area">
-                <div class="markdown-body" v-html="renderedContent"></div>
+              <el-form-item label="科目" prop="subjectId">
+                <div class="subject-selector">
+                  <div class="selected-subjects" v-if="selectedSubjects.length > 0">
+                    <el-tag
+                      v-for="subject in selectedSubjects"
+                      :key="subject.subjectId"
+                      :closable="true"
+                      @close="removeSubject(subject)"
+                      type="primary"
+                      class="subject-tag"
+                    >
+                      {{ subject.subjectName }}
+                    </el-tag>
+                  </div>
+                  
+                  <el-dropdown trigger="click" @command="handleSubjectCommand" class="subject-dropdown">
+                    <el-button size="small" type="primary" plain>
+                      <i class="el-icon-plus"></i>
+                      {{ selectedSubjects.length > 0 ? '添加科目' : '选择科目' }}
+                    </el-button>
+                    <el-dropdown-menu slot="dropdown">
+                      <div class="subject-menu">
+                        <div class="subject-header">选择科目</div>
+                        <div class="subject-options">
+                          <el-dropdown-item
+                            v-for="subject in availableSubjects"
+                            :key="subject.subjectId"
+                            :command="`select-${subject.subjectId}`"
+                            class="subject-option"
+                          >
+                            <div class="subject-info">
+                              <span class="subject-name">{{ subject.subjectName }}</span>
+                              <span class="subject-desc">{{ subject.description || '暂无描述' }}</span>
+                            </div>
+                          </el-dropdown-item>
+                          <div v-if="availableSubjects.length === 0" class="no-subjects">
+                            <span>暂无可选科目</span>
+                          </div>
+                        </div>
+                        <el-divider style="margin: 8px 0;"></el-divider>
+                        <el-dropdown-item command="create-subject" class="create-subject-item">
+                          <i class="el-icon-plus"></i> 新建科目
+                        </el-dropdown-item>
+                      </div>
+                    </el-dropdown-menu>
+                  </el-dropdown>
+                </div>
+              </el-form-item>
+
+              <el-form-item label="难度" prop="difficulty">
+                <el-select v-model="form.difficulty" placeholder="请选择难度" style="width: 100%">
+                  <el-option label="简单" :value="1" />
+                  <el-option label="中等" :value="2" />
+                  <el-option label="困难" :value="3" />
+                </el-select>
+              </el-form-item>
+
+              <el-form-item label="摘要" prop="summary">
+                <el-input
+                  type="textarea"
+                  v-model="form.summary"
+                  placeholder="请简要描述知识点内容"
+                  :rows="6"
+                />
+              </el-form-item>
+
+              <!-- 提交按钮 -->
+              <div class="submit-actions">
+                <el-button type="primary" @click="handleSubmit" :loading="submitting" style="width: 100%; margin-bottom: 10px;">
+                  <i class="el-icon-upload"></i>
+                  发布知识点
+                </el-button>
+                <el-button @click="handleReset" style="width: 100%;">
+                  <i class="el-icon-refresh"></i>
+                  重置
+                </el-button>
               </div>
             </div>
-          </el-form-item>
-        </div>
-
-        <!-- 示例代码（可选） -->
-        <div class="form-section">
-          <h3 class="section-title">💻 示例代码（可选）</h3>
-          <el-form-item label="示例代码">
-            <el-input
-              type="textarea"
-              v-model="form.example"
-              placeholder="请提供相关的示例代码..."
-              :rows="8"
-              class="code-textarea"
-            />
-          </el-form-item>
-        </div>
-
-        <!-- 注意事项（可选） -->
-        <div class="form-section">
-          <h3 class="section-title">⚠️ 注意事项（可选）</h3>
-          <el-form-item label="注意事项">
-            <el-input
-              type="textarea"
-              v-model="form.note"
-              placeholder="请说明使用时需要注意的事项..."
-              :rows="4"
-            />
-          </el-form-item>
-        </div>
-
-        <!-- 参考链接（可选） -->
-        <div class="form-section">
-          <h3 class="section-title">🔗 参考链接（可选）</h3>
-          <el-form-item label="参考链接">
-            <el-input
-              type="textarea"
-              v-model="form.reference"
-              placeholder="请提供相关的参考资料链接..."
-              :rows="3"
-            />
-          </el-form-item>
-        </div>
-
-        <!-- 提交按钮 -->
-        <div class="form-actions">
-          <el-button type="primary" @click="handleSubmit" :loading="submitting">
-            <i class="el-icon-upload"></i>
-            发布知识点
-          </el-button>
-          <el-button @click="handleReset">
-            <i class="el-icon-refresh"></i>
-            重置
-          </el-button>
+          </div>
         </div>
       </el-form>
     </el-card>
@@ -215,8 +233,7 @@
 </template>
 
 <script>
-import { publishKnowledge, getSubjects, getChaptersBySubject } from '@/api/knowledge'
-import { marked } from 'marked'
+import { getSubjects, publishKnowledge, createSubject } from '@/api/knowledge'
 
 export default {
   name: 'KnowledgePublish',
@@ -225,13 +242,9 @@ export default {
       form: {
         title: '',
         subjectId: null,
-        chapterId: null,
-        difficulty: '',
+        difficulty: null,
         summary: '',
-        content: '',
-        example: '',
-        note: '',
-        reference: ''
+        content: ''
       },
       rules: {
         title: [
@@ -241,15 +254,11 @@ export default {
         subjectId: [
           { required: true, message: '请选择科目', trigger: 'change' }
         ],
-        chapterId: [
-          { required: true, message: '请选择章节', trigger: 'change' }
-        ],
         difficulty: [
           { required: true, message: '请选择难度等级', trigger: 'change' }
         ],
         summary: [
-          { required: true, message: '请输入内容摘要', trigger: 'blur' },
-          { min: 100, max: 300, message: '摘要长度应为 100 到 300 个字符', trigger: 'blur' }
+          { required: true, message: '请输入内容摘要', trigger: 'blur' }
         ],
         content: [
           { required: true, message: '请输入详细内容', trigger: 'blur' },
@@ -257,19 +266,24 @@ export default {
         ]
       },
       subjectList: [],
-      chapterList: [],
-      activeTab: 'edit',
+      selectedSubjects: [], // 已选择的科目列表
       submitting: false,
-      successDialogVisible: false
+      successDialogVisible: false,
+      scrollSyncing: false,
+      scrollTimeout: null
     }
   },
   computed: {
-    renderedContent() {
-      return this.form.content ? marked(this.form.content) : '<p class="empty-preview">暂无内容预览</p>'
+    // 计算可选择的科目列表（排除已选择的）
+    availableSubjects() {
+      return this.subjectList.filter(subject => 
+        !this.selectedSubjects.find(selected => selected.subjectId === subject.subjectId)
+      )
     }
   },
   mounted() {
     this.loadSubjects()
+    this.initScrollSync()
   },
   methods: {
     async loadSubjects() {
@@ -280,22 +294,6 @@ export default {
         }
       } catch (error) {
         console.error('获取科目列表失败:', error)
-      }
-    },
-
-    async handleSubjectChange(subjectId) {
-      this.form.chapterId = null
-      this.chapterList = []
-      
-      if (subjectId) {
-        try {
-          const res = await getChaptersBySubject(subjectId)
-          if (res.code === 200) {
-            this.chapterList = res.data
-          }
-        } catch (error) {
-          console.error('获取章节列表失败:', error)
-        }
       }
     },
 
@@ -338,7 +336,6 @@ export default {
 
     handleReset() {
       this.$refs.publishForm.resetFields()
-      this.chapterList = []
     },
 
     goBack() {
@@ -353,7 +350,161 @@ export default {
     continuePublish() {
       this.successDialogVisible = false
       this.handleReset()
+    },
+
+    // 初始化滚动同步
+    initScrollSync() {
+      this.$nextTick(() => {
+        const editorEl = this.$refs.contentEditor?.$refs?.textarea
+        if (editorEl) {
+          editorEl.addEventListener('scroll', this.handleEditorScroll)
+        }
+      })
+    },
+
+    // 处理编辑器滚动，同步预览区域
+    handleEditorScroll(event) {
+      if (this.scrollSyncing) return
+      
+      clearTimeout(this.scrollTimeout)
+      this.scrollTimeout = setTimeout(() => {
+        const editor = event.target
+        const preview = this.$refs.previewContent
+        
+        if (editor && preview && !this.scrollSyncing) {
+          const scrollPercentage = editor.scrollTop / Math.max(1, editor.scrollHeight - editor.clientHeight)
+          const previewScrollTop = scrollPercentage * Math.max(0, preview.scrollHeight - preview.clientHeight)
+          
+          this.scrollSyncing = true
+          preview.scrollTop = previewScrollTop
+          
+          setTimeout(() => {
+            this.scrollSyncing = false
+          }, 100)
+        }
+      }, 16) // 节流到 60fps
+    },
+
+    handleCopySuccess() {
+      this.$message.success('复制成功')
+    },
+
+    // 插入代码块
+    insertCodeBlock() {
+      const codeBlock = '```javascript\n// 在这里输入代码\nconsole.log("Hello World");\n```\n'
+      this.insertTextAtCursor(codeBlock)
+    },
+
+    // 插入表格
+    insertTable() {
+      const table = '| 列1 | 列2 | 列3 |\n|-----|-----|-----|\n| 数据1 | 数据2 | 数据3 |\n| 数据4 | 数据5 | 数据6 |\n'
+      this.insertTextAtCursor(table)
+    },
+
+    // 在光标位置插入文本
+    insertTextAtCursor(text) {
+      const textarea = this.$refs.contentEditor.$refs.textarea
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      
+      this.form.content = this.form.content.substring(0, start) + text + this.form.content.substring(end)
+      
+      this.$nextTick(() => {
+        textarea.focus()
+        const newPosition = start + text.length
+        textarea.setSelectionRange(newPosition, newPosition)
+      })
+    },
+
+    // ==================== 科目管理方法 ====================
+
+    // 处理科目下拉菜单命令
+    handleSubjectCommand(command) {
+      if (command === 'create-subject') {
+        this.showCreateSubjectDialog()
+      } else if (command.startsWith('select-')) {
+        const subjectId = parseInt(command.replace('select-', ''))
+        this.selectSubject(subjectId)
+      }
+    },
+
+    // 选择科目
+    selectSubject(subjectId) {
+      const subject = this.subjectList.find(s => s.subjectId === subjectId)
+      if (subject && !this.selectedSubjects.find(s => s.subjectId === subjectId)) {
+        this.selectedSubjects.push(subject)
+        // 更新form中的subjectId（取第一个选中的科目作为主科目）
+        if (this.selectedSubjects.length === 1) {
+          this.form.subjectId = subjectId
+        }
+      }
+    },
+
+    // 移除科目
+    removeSubject(subject) {
+      const index = this.selectedSubjects.findIndex(s => s.subjectId === subject.subjectId)
+      if (index > -1) {
+        this.selectedSubjects.splice(index, 1)
+        // 如果移除的是主科目，重新设置主科目
+        if (this.form.subjectId === subject.subjectId) {
+          this.form.subjectId = this.selectedSubjects.length > 0 ? this.selectedSubjects[0].subjectId : null
+        }
+      }
+    },
+
+    // 显示创建科目对话框
+    showCreateSubjectDialog() {
+      this.$prompt('请输入科目名称', '新建科目', {
+        confirmButtonText: '创建',
+        cancelButtonText: '取消',
+        inputPattern: /^.{1,50}$/,
+        inputErrorMessage: '科目名称长度为1-50个字符'
+      }).then(({ value }) => {
+        this.createNewSubject(value)
+      }).catch(() => {
+        // 用户取消
+      })
+    },
+
+    // 创建新科目
+    async createNewSubject(subjectName) {
+      try {
+        // 这里需要添加创建科目的API调用
+        const response = await this.createSubject({
+          subjectName: subjectName,
+          description: '',
+          status: 1
+        })
+        if (response.code === 200) {
+          this.$message.success('创建科目成功')
+          // 重新加载科目列表
+          await this.loadSubjects()
+          // 自动选择新创建的科目
+          const newSubject = this.subjectList.find(s => s.subjectName === subjectName)
+          if (newSubject) {
+            this.selectSubject(newSubject.subjectId)
+          }
+        } else {
+          this.$message.error(response.msg || '创建失败')
+        }
+      } catch (error) {
+        this.$message.error('创建失败：' + error.message)
+      }
+    },
+
+    // 创建科目API调用
+    async createSubject(subjectData) {
+      return await createSubject(subjectData)
     }
+  },
+
+  beforeDestroy() {
+    // 清理事件监听器
+    const editorEl = this.$refs.contentEditor?.$refs?.textarea
+    if (editorEl) {
+      editorEl.removeEventListener('scroll', this.handleEditorScroll)
+    }
+    clearTimeout(this.scrollTimeout)
   }
 }
 </script>
@@ -361,7 +512,7 @@ export default {
 <style scoped>
 .knowledge-publish {
   padding: 20px;
-  max-width: 1000px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -383,24 +534,72 @@ export default {
 }
 
 .publish-form {
-  padding: 20px 0;
+  padding: 0;
 }
 
-.form-section {
-  margin-bottom: 30px;
-  padding: 20px;
-  background: #fafbfc;
+.publish-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.editor-container {
+  flex: 1;
+  min-width: 0;
+}
+
+.editor-wrapper {
+  background: #fff;
   border-radius: 8px;
-  border: 1px solid #e4e7ed;
 }
 
-.section-title {
+.settings-container {
+  width: 350px;
+  flex-shrink: 0;
+}
+
+.settings-wrapper {
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 20px;
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+.settings-title {
   margin: 0 0 20px 0;
   font-size: 16px;
   font-weight: bold;
   color: #303133;
+  padding-bottom: 12px;
   border-bottom: 2px solid #409eff;
-  padding-bottom: 8px;
+}
+
+.settings-wrapper .el-form-item {
+  margin-bottom: 20px;
+}
+
+.settings-wrapper >>> .el-form-item__label {
+  font-weight: 600;
+  color: #606266;
+  padding: 0 0 8px 0;
+  line-height: 20px;
+  display: block;
+  text-align: left;
+  width: 100%;
+}
+
+.settings-wrapper >>> .el-form-item__content {
+  margin-left: 0 !important;
+}
+
+.submit-actions {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #e4e7ed;
 }
 
 .markdown-editor {
@@ -413,35 +612,87 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 15px;
-  background: #f5f7fa;
-  border-bottom: 1px solid #dcdfe6;
+  padding: 8px 15px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e4e7ed;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.editor-tabs {
+.toolbar-groups {
   display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
-.tab-item {
-  padding: 5px 15px;
-  margin-left: 10px;
-  cursor: pointer;
-  border: 1px solid #dcdfe6;
+.toolbar-groups .el-button-group {
   border-radius: 4px;
-  background: #fff;
-  font-size: 14px;
-  color: #606266;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-.tab-item.active {
+.toolbar-groups .el-button {
+  height: 32px;
+  min-width: 32px;
+  padding: 6px 8px;
+  font-size: 14px;
+  border: none;
+  background: #fff;
+  color: #606266;
+  transition: all 0.2s;
+}
+
+.toolbar-groups .el-button:hover {
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+.toolbar-groups .el-button:focus {
   background: #409eff;
-  border-color: #409eff;
   color: #fff;
+}
+
+.toolbar-groups .el-button strong,
+.toolbar-groups .el-button em {
+  font-style: normal;
+  font-weight: bold;
+}
+
+.toolbar-tip {
+  font-size: 12px;
+  color: #909399;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.editor-preview-container {
+  display: flex;
+  height: calc(100vh - 250px);
+  border-top: 1px solid #dcdfe6;
 }
 
 .editor-area,
 .preview-area {
-  min-height: 400px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-area {
+  border-right: 1px solid #dcdfe6;
+}
+
+.area-header {
+  padding: 10px 15px;
+  background: #f5f7fa;
+  border-bottom: 1px solid #e4e7ed;
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 
 .markdown-textarea {
@@ -449,75 +700,86 @@ export default {
   border-radius: 0;
 }
 
-.markdown-textarea >>> .el-textarea__inner {
-  border: none;
-  resize: vertical;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  line-height: 1.6;
+.markdown-textarea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
-.preview-area {
+.markdown-textarea >>> .el-textarea__inner {
+  border: none;
+  resize: none;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  line-height: 1.6;
+  height: 100% !important;
   padding: 15px;
 }
 
-.markdown-body {
-  line-height: 1.8;
-  color: #333;
+.markdown-textarea >>> .el-textarea__inner::-webkit-scrollbar {
+  width: 8px;
 }
 
-.markdown-body >>> h1,
-.markdown-body >>> h2,
-.markdown-body >>> h3 {
-  margin-top: 20px;
-  margin-bottom: 10px;
-  font-weight: bold;
+.markdown-textarea >>> .el-textarea__inner::-webkit-scrollbar-thumb {
+  background: #dcdfe6;
+  border-radius: 4px;
 }
 
-.markdown-body >>> h1 {
-  font-size: 24px;
-  border-bottom: 2px solid #eee;
-  padding-bottom: 10px;
+.markdown-textarea >>> .el-textarea__inner::-webkit-scrollbar-thumb:hover {
+  background: #c0c4cc;
 }
 
-.markdown-body >>> h2 {
-  font-size: 20px;
+.preview-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background: #fff;
 }
 
-.markdown-body >>> h3 {
-  font-size: 18px;
+.preview-content::-webkit-scrollbar {
+  width: 8px;
 }
 
-.markdown-body >>> p {
-  margin: 15px 0;
+.preview-content::-webkit-scrollbar-thumb {
+  background: #dcdfe6;
+  border-radius: 4px;
 }
 
-.markdown-body >>> pre {
-  background: #f6f8fa;
-  border: 1px solid #e1e4e8;
-  border-radius: 6px;
-  padding: 16px;
-  overflow: auto;
+.preview-content::-webkit-scrollbar-thumb:hover {
+  background: #c0c4cc;
 }
 
-.markdown-body >>> code {
-  background: #f6f8fa;
-  border-radius: 3px;
-  padding: 2px 4px;
-  font-size: 85%;
+.md-preview-content {
+  padding: 0;
+  background: transparent;
 }
 
-.markdown-body >>> blockquote {
-  border-left: 4px solid #dfe2e5;
-  padding: 0 16px;
-  color: #6a737d;
-  margin: 15px 0;
+/* 为v-md-preview组件的列表强制添加样式 */
+.md-preview-content >>> ul {
+  padding-left: 20px !important;
+  margin: 15px 0 !important;
 }
 
-.empty-preview {
-  color: #c0c4cc;
-  text-align: center;
-  padding: 50px 0;
-  font-style: italic;
+.md-preview-content >>> ol {
+  padding-left: 20px !important;
+  margin: 15px 0 !important;
+}
+
+.md-preview-content >>> li {
+  margin: 8px 0 !important;
+  list-style-type: disc !important;
+  display: list-item !important;
+}
+
+.md-preview-content >>> ol li {
+  list-style-type: decimal !important;
+}
+
+.md-preview-content >>> ul ul li {
+  list-style-type: circle !important;
+}
+
+.md-preview-content >>> ul ul ul li {
+  list-style-type: square !important;
 }
 
 .code-textarea >>> .el-textarea__inner {
@@ -525,16 +787,182 @@ export default {
   line-height: 1.5;
 }
 
-.form-actions {
-  text-align: center;
-  padding: 30px 0;
-  border-top: 1px solid #e4e7ed;
-  margin-top: 30px;
+/* 响应式设计 */
+@media screen and (max-width: 1024px) {
+  .publish-layout {
+    flex-direction: column;
+  }
+  
+  .settings-container {
+    width: 100%;
+  }
+  
+  .settings-wrapper {
+    position: relative;
+    top: 0;
+    max-height: none;
+  }
+  
+  .editor-preview-container {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .editor-area {
+    border-right: none;
+    border-bottom: 1px solid #dcdfe6;
+    min-height: 300px;
+  }
+  
+  .preview-area {
+    min-height: 300px;
+  }
+  
+  .toolbar-groups {
+    gap: 6px;
+  }
+  
+  .toolbar-groups .el-button {
+    min-width: 28px;
+    height: 28px;
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+  
+  .toolbar-tip {
+    display: none;
+  }
 }
 
-.form-actions .el-button {
-  margin: 0 10px;
-  padding: 12px 30px;
-  font-size: 16px;
+/* CSDN风格的科目选择器样式 */
+.subject-selector {
+  min-height: 40px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  padding: 8px 12px;
+  background: #fff;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  transition: border-color 0.2s;
+}
+
+.subject-selector:hover {
+  border-color: #c0c4cc;
+}
+
+.subject-selector:focus-within {
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+.selected-subjects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-right: 8px;
+}
+
+.subject-tag {
+  margin: 0;
+  font-size: 13px;
+  height: 24px;
+  line-height: 22px;
+  padding: 0 8px;
+  background: #ecf5ff;
+  border-color: #b3d8ff;
+  color: #409eff;
+}
+
+.subject-tag .el-tag__close {
+  color: #409eff;
+  font-size: 12px;
+}
+
+.subject-tag .el-tag__close:hover {
+  color: #fff;
+  background: #409eff;
+}
+
+.subject-dropdown .el-button {
+  height: 28px;
+  padding: 4px 8px;
+  font-size: 13px;
+  border: 1px dashed #d9d9d9;
+  color: #666;
+}
+
+.subject-dropdown .el-button:hover {
+  border-color: #409eff;
+  color: #409eff;
+}
+
+/* 科目下拉菜单样式 */
+.subject-menu {
+  padding: 8px 0;
+  min-width: 280px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.subject-header {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  border-bottom: 1px solid #ebeef5;
+  margin-bottom: 4px;
+}
+
+.subject-options {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.subject-option {
+  padding: 0 !important;
+}
+
+.subject-info {
+  padding: 10px 16px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.subject-name {
+  font-size: 14px;
+  color: #303133;
+  font-weight: 500;
+}
+
+.subject-desc {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
+}
+
+.no-subjects {
+  padding: 20px;
+  text-align: center;
+  color: #909399;
+  font-size: 13px;
+}
+
+.create-subject-item {
+  color: #409eff !important;
+  font-weight: 500;
+  background: #f8f9ff !important;
+}
+
+.create-subject-item:hover {
+  background-color: #ecf5ff !important;
+}
+
+.create-subject-item i {
+  margin-right: 6px;
+  font-size: 12px;
 }
 </style>

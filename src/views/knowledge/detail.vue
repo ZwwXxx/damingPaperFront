@@ -15,7 +15,6 @@
           <h1 class="title">{{ pointDetail.title }}</h1>
           <div class="meta-info">
             <el-tag size="small">{{ pointDetail.subjectName }}</el-tag>
-            <el-tag size="small" type="info">{{ pointDetail.chapterName }}</el-tag>
             <el-tag
               v-if="pointDetail.difficulty"
               size="small"
@@ -32,15 +31,8 @@
 
         <el-divider></el-divider>
 
-        <!-- 摘要 -->
-        <div v-if="pointDetail.summary" class="summary-section">
-          <h3 class="section-title">📌 摘要</h3>
-          <p class="summary-text">{{ pointDetail.summary }}</p>
-        </div>
-
-        <!-- 主要内容 -->
+        <!-- 知识点内容 -->
         <div class="content-section">
-          <h3 class="section-title">📖 详细内容</h3>
           <div class="content-box" v-html="formatContent(pointDetail.content)"></div>
         </div>
 
@@ -73,7 +65,7 @@
               <i class="el-icon-view"></i> 浏览 {{ pointDetail.viewCount }}
             </span>
             <span class="stat-item">
-              <i class="el-icon-star-off"></i> 点赞 {{ pointDetail.likeCount }}
+              <i class="el-icon-thumb"></i> 点赞 {{ pointDetail.likeCount }}
             </span>
             <span class="stat-item">
               <i class="el-icon-folder"></i> 收藏 {{ pointDetail.collectCount }}
@@ -84,19 +76,58 @@
           </div>
           <div class="actions">
             <el-button
-              :type="pointDetail.isLiked ? 'danger' : 'default'"
-              :icon="pointDetail.isLiked ? 'el-icon-star-on' : 'el-icon-star-off'"
+              v-if="pointDetail.authorId === currentUserId"
+              type="success"
+              icon="el-icon-edit"
+              @click="handleEdit"
+            >
+              编辑
+            </el-button>
+            <el-button
+              :type="pointDetail.isLiked ? 'primary' : 'default'"
+              :icon="pointDetail.isLiked ? 'el-icon-thumb' : 'el-icon-thumb'"
               @click="handleLike"
             >
               {{ pointDetail.isLiked ? '已点赞' : '点赞' }}
             </el-button>
-            <el-button
-              :type="pointDetail.isCollected ? 'warning' : 'default'"
-              :icon="pointDetail.isCollected ? 'el-icon-folder-checked' : 'el-icon-folder'"
-              @click="handleCollect"
-            >
-              {{ pointDetail.isCollected ? '已收藏' : '收藏' }}
-            </el-button>
+            <el-dropdown trigger="click" @command="handleFolderCommand" @visible-change="onCollectDropdownChange">
+              <el-button
+                :type="pointDetail.isCollected ? 'warning' : 'default'"
+                :icon="pointDetail.isCollected ? 'el-icon-folder-checked' : 'el-icon-folder'"
+              >
+                {{ pointDetail.isCollected ? '已收藏' : '收藏' }}
+                <i class="el-icon-arrow-down el-icon--right"></i>
+              </el-button>
+              <el-dropdown-menu slot="dropdown">
+                <div class="collect-folder-menu">
+                  <div class="folder-header">选择收藏夹</div>
+                  <div v-if="userFolders.length === 0" class="no-folders">
+                    <span>还没有收藏夹</span>
+                  </div>
+                  <div v-else>
+                    <el-dropdown-item
+                      v-for="folder in userFolders"
+                      :key="folder.folderId"
+                      :command="`collect-${folder.folderId}`"
+                      class="folder-item"
+                    >
+                      <div class="folder-info">
+                        <span class="folder-name">
+                          <i class="el-icon-folder" v-if="folder.isDefault"></i>
+                          <i class="el-icon-folder-opened" v-else></i>
+                          {{ folder.folderName }}
+                        </span>
+                        <span class="folder-count">{{ folder.collectCount }}</span>
+                      </div>
+                    </el-dropdown-item>
+                  </div>
+                  <el-divider style="margin: 8px 0;"></el-divider>
+                  <el-dropdown-item command="create-folder" class="create-folder-item">
+                    <i class="el-icon-plus"></i> 新建收藏夹
+                  </el-dropdown-item>
+                </div>
+              </el-dropdown-menu>
+            </el-dropdown>
           </div>
         </div>
 
@@ -308,7 +339,10 @@ import {
   getKnowledgeComments,
   addKnowledgeComment,
   deleteKnowledgeComment,
-  toggleCommentLike
+  toggleCommentLike,
+  getUserFolders,
+  createFolder,
+  collectToFolder
 } from '@/api/knowledge'
 import { marked } from 'marked'
 import { mapGetters } from 'vuex'
@@ -319,6 +353,9 @@ export default {
     ...mapGetters(['avatar', 'id']),
     currentUserAvatar() {
       return this.avatar || '/default-avatar.png'
+    },
+    currentUserId() {
+      return this.$store.getters.userId || this.id
     },
     // 计算总评论数（一级评论 + 所有二级评论）
     totalCommentCount() {
@@ -355,7 +392,15 @@ export default {
       parentComment: null,
       submittingReply: false,
       defaultAvatar: '/default-avatar.png',
-      expandedComments: {} // 存储每个评论的展开状态
+      expandedComments: {}, // 存储每个评论的展开状态
+      // 收藏夹相关数据
+      userFolders: [], // 用户的收藏夹列表
+      createFolderDialog: false,
+      newFolder: {
+        folderName: '',
+        description: '',
+        isPublic: 0
+      }
     }
   },
   created() {
@@ -413,7 +458,11 @@ export default {
           this.$message.error('操作失败，请先登录')
         })
     },
-    /** 收藏 */
+    /** 编辑 */
+    handleEdit() {
+      this.$router.push({ name: 'knowledgePublish', query: { pointId: this.pointDetail.pointId } })
+    },
+    /** 收藏（使用默认收藏夹） */
     handleCollect() {
       toggleCollect(this.pointDetail.pointId)
         .then(response => {
@@ -424,10 +473,93 @@ export default {
           } else {
             this.pointDetail.collectCount--
           }
+          // 重新加载收藏夹列表以更新数量
+          this.loadUserFolders()
         })
         .catch(() => {
           this.$message.error('操作失败，请先登录')
         })
+    },
+
+    /** 收藏夹下拉菜单显隐事件 */
+    onCollectDropdownChange(visible) {
+      if (visible) {
+        this.loadUserFolders()
+      }
+    },
+
+    /** 加载用户收藏夹列表 */
+    async loadUserFolders() {
+      try {
+        const response = await getUserFolders()
+        if (response.code === 200) {
+          this.userFolders = response.data
+        }
+      } catch (error) {
+        console.error('获取收藏夹失败:', error)
+      }
+    },
+
+    /** 处理收藏夹菜单命令 */
+    handleFolderCommand(command) {
+      if (command === 'create-folder') {
+        this.showCreateFolderDialog()
+      } else if (command.startsWith('collect-')) {
+        const folderId = command.replace('collect-', '')
+        this.collectToSpecificFolder(parseInt(folderId))
+      }
+    },
+
+    /** 收藏到指定收藏夹 */
+    collectToSpecificFolder(folderId) {
+      collectToFolder(this.pointDetail.pointId, folderId)
+        .then(response => {
+          this.$message.success(response.msg)
+          this.pointDetail.isCollected = response.data
+          if (response.data) {
+            this.pointDetail.collectCount++
+          } else {
+            this.pointDetail.collectCount--
+          }
+          // 重新加载收藏夹列表以更新数量
+          this.loadUserFolders()
+        })
+        .catch(() => {
+          this.$message.error('操作失败，请先登录')
+        })
+    },
+
+    /** 显示创建收藏夹对话框 */
+    showCreateFolderDialog() {
+      this.$prompt('请输入收藏夹名称', '创建收藏夹', {
+        confirmButtonText: '创建',
+        cancelButtonText: '取消',
+        inputPattern: /^.{1,50}$/,
+        inputErrorMessage: '收藏夹名称长度为1-50个字符'
+      }).then(({ value }) => {
+        this.createNewFolder(value)
+      }).catch(() => {
+        // 用户取消
+      })
+    },
+
+    /** 创建新收藏夹 */
+    async createNewFolder(folderName) {
+      try {
+        const response = await createFolder({
+          folderName: folderName,
+          description: '',
+          isPublic: 0
+        })
+        if (response.code === 200) {
+          this.$message.success('创建收藏夹成功')
+          this.loadUserFolders()
+        } else {
+          this.$message.error(response.msg || '创建失败')
+        }
+      } catch (error) {
+        this.$message.error('创建失败：' + error.message)
+      }
     },
     /** 返回 */
     goBack() {
@@ -609,24 +741,9 @@ export default {
         const rect = heading.getBoundingClientRect()
         const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop
         
-        // 计算目标滚动位置
+        // 计算目标滚动位置，使用固定偏移量，避免导航栏状态变化影响
         const targetScrollTop = currentScrollTop + rect.top
-        
-        // 判断滚动方向：向上滚动时导航栏会显示，需要预留更多空间
-        const isScrollingUp = targetScrollTop < currentScrollTop
-        
-        // 根据滚动方向计算偏移量
-        // 向上滚动时，导航栏会自动显示，所以始终预留80px
-        // 向下滚动时，根据当前导航栏状态决定
-        let navOffset = 80 // 默认预留导航栏空间
-        if (!isScrollingUp) {
-          // 向下滚动时，检查当前导航栏状态
-          const navBar = document.querySelector('.nav-bar')
-          const isNavHidden = navBar && navBar.classList.contains('nav-hidden')
-          navOffset = isNavHidden ? 20 : 80
-        }
-        
-        // 计算最终滚动位置
+        const navOffset = 100 // 使用固定偏移量，适应导航栏隐藏和显示两种状态
         const finalScrollTop = targetScrollTop - navOffset
         
         window.scrollTo({
@@ -681,12 +798,8 @@ export default {
       })
       
       const range = 200
+      const titleCheckHeight = 100 // 使用固定阈值，适应导航栏各种状态
       let targetTitleIndex = -1
-      
-      // 检测导航栏状态，统一在函数开头获取
-      const navBar = document.querySelector('.nav-bar')
-      const isNavHidden = navBar && navBar.classList.contains('nav-hidden')
-      const titleCheckHeight = isNavHidden ? 20 : 70
       
       for (let i = 0; i < this.titlesDoms.length; i++) {
         const rect = rects[i]
@@ -716,17 +829,13 @@ export default {
       
       const toTop = document.documentElement.scrollTop || document.body.scrollTop
       
-      // 主流做法：滚动超过头部区域(约150px)就固定目录，便于用户导航
-      if (toTop > 150) {
+      // 提前触发固定定位，避免出现间隙
+      // 当滚动到目录原始位置附近时就触发，实现无缝过渡
+      if (toTop > 50) {
         this.$refs.directory.classList.add('directory-fixed')
         this.fixedCata.width = this.$refs.directory.parentElement.clientWidth + 'px'
-        
-        // 根据导航栏状态调整目录位置
-        const fixedHeight = isNavHidden ? 40 : 120
-        this.$refs.directory.style.top = fixedHeight + 'px'
       } else {
         this.$refs.directory.classList.remove('directory-fixed')
-        this.$refs.directory.style.top = ''
       }
     },
     /** 防抖函数 */
@@ -1053,6 +1162,33 @@ export default {
   color: #606266;
 }
 
+/* 确保列表样式显示 - 多重选择器确保优先级 */
+.knowledge-detail .content-section ul,
+.content-section ul,
+.content-box ul {
+  list-style: disc !important;
+  list-style-type: disc !important;
+  padding-left: 30px !important;
+  margin: 10px 0 !important;
+}
+
+.knowledge-detail .content-section ol,
+.content-section ol,
+.content-box ol {
+  list-style: decimal !important;
+  list-style-type: decimal !important;
+  padding-left: 30px !important;
+  margin: 10px 0 !important;
+}
+
+.knowledge-detail .content-section li,
+.content-section li,
+.content-box li {
+  display: list-item !important;
+  margin: 5px 0 !important;
+  list-style: inherit !important;
+}
+
 /* Markdown样式 */
 .content-box >>> h1,
 .content-box >>> h2,
@@ -1095,14 +1231,25 @@ export default {
   margin: 10px 0;
 }
 
-.content-box >>> ul,
-.content-box >>> ol {
+.content-box ::v-deep ul,
+.content-box ::v-deep ol {
   padding-left: 30px;
   margin: 10px 0;
+  list-style-position: outside;
 }
 
-.content-box >>> li {
+.content-box ::v-deep ul {
+  list-style-type: disc !important;
+}
+
+.content-box ::v-deep ol {
+  list-style-type: decimal !important;
+}
+
+.content-box ::v-deep li {
   margin: 5px 0;
+  display: list-item !important;
+  list-style: inherit !important;
 }
 
 .content-box >>> code {
@@ -1421,10 +1568,11 @@ export default {
 /* 固定定位样式 */
 .directory-fixed {
   position: fixed;
-  top: 120px;
+  top: 130px;
   z-index: 100;
   box-shadow: 0 4px 25px rgba(0, 0, 0, 0.12);
   border: 1px solid #e4e7ed;
+  transition: none; /* 禁用过渡动画，避免位置跳动 */
 }
 
 /* 评论区样式 */
@@ -1764,5 +1912,70 @@ export default {
     width: 28px;
     height: 28px;
   }
+}
+
+/* 收藏夹菜单样式 */
+.collect-folder-menu {
+  padding: 8px 0;
+  min-width: 200px;
+}
+
+.folder-header {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  border-bottom: 1px solid #ebeef5;
+  margin-bottom: 4px;
+}
+
+.no-folders {
+  padding: 16px;
+  text-align: center;
+  color: #909399;
+  font-size: 13px;
+}
+
+.folder-item {
+  padding: 0 !important;
+}
+
+.folder-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  width: 100%;
+}
+
+.folder-name {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #303133;
+}
+
+.folder-name i {
+  margin-right: 6px;
+  color: #606266;
+}
+
+.folder-count {
+  font-size: 12px;
+  color: #909399;
+  background: #f4f4f5;
+  padding: 2px 6px;
+  border-radius: 8px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.create-folder-item {
+  color: #409eff !important;
+  font-weight: 500;
+}
+
+.create-folder-item:hover {
+  background-color: #ecf5ff !important;
 }
 </style>

@@ -107,6 +107,7 @@ const actions = {
 const getters = {
     avatar: state => state.avatar,
     id: state => state.id,
+    userId: state => state.id,  // userId别名
     userName: state => state.userName,  // 登录名（zww）
     nickName: state => state.nickName,  // 显示名（6666）
 }

@@ -33,9 +33,9 @@
             </div>
             <div class="header-right">
               <el-button
-                type="danger"
+                type="primary"
                 size="mini"
-                icon="el-icon-star-on"
+                icon="el-icon-thumb"
                 circle
                 title="点赞"
                 @click.stop="handleLike(point)"
@@ -58,14 +58,13 @@
           <div class="item-footer">
             <div class="footer-left">
               <el-tag size="mini" effect="plain">{{ point.subjectName }}</el-tag>
-              <el-tag size="mini" effect="plain" type="info">{{ point.chapterName }}</el-tag>
             </div>
             <div class="footer-right">
               <span class="stat-item">
                 <i class="el-icon-view"></i> {{ point.viewCount }}
               </span>
               <span class="stat-item">
-                <i class="el-icon-star-off"></i> {{ point.likeCount }}
+                <i class="el-icon-thumb"></i> {{ point.likeCount }}
               </span>
               <span class="stat-item">
                 <i class="el-icon-folder"></i> {{ point.collectCount }}

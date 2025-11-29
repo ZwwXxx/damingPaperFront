@@ -3,54 +3,104 @@
     <el-card class="box-card">
       <div slot="header" class="clearfix">
         <span class="title">📚 知识点库</span>
+        <el-badge v-if="totalKnowledgeCount > 0" :value="totalKnowledgeCount" class="total-badge" type="success" />
       </div>
 
       <div class="filter-bar">
         <el-row :gutter="20">
           <el-col :span="6">
-            <el-select v-model="queryParams.subjectId" placeholder="选择科目" clearable @change="handleSubjectChange">
+            <el-select v-model="queryParams.subjectId" placeholder="选择科目" clearable @change="loadPointList">
               <el-option v-for="subject in subjectList" :key="subject.subjectId" :label="subject.subjectName" :value="subject.subjectId" />
             </el-select>
           </el-col>
-          <el-col :span="6">
-            <el-select v-model="queryParams.chapterId" placeholder="选择章节" clearable :disabled="!queryParams.subjectId" @change="loadPointList">
-              <el-option v-for="chapter in chapterList" :key="chapter.chapterId" :label="chapter.chapterName" :value="chapter.chapterId" />
+          <el-col :span="5">
+            <el-select v-model="queryParams.difficulty" placeholder="难度" clearable @change="loadPointList">
+              <el-option label="简单" :value="1" />
+              <el-option label="中等" :value="2" />
+              <el-option label="困难" :value="3" />
             </el-select>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="10">
             <el-input v-model="queryParams.title" placeholder="搜索知识点标题" clearable @keyup.enter.native="loadPointList">
               <el-button slot="append" icon="el-icon-search" @click="loadPointList" />
             </el-input>
           </el-col>
-          <el-col :span="4">
+          <el-col :span="3">
             <el-button type="primary" @click="loadPointList">查询</el-button>
           </el-col>
         </el-row>
       </div>
 
-      <div class="quick-nav">
-        <div class="nav-left">
-          <el-button-group>
-            <el-button size="small" @click="loadHotPoints">
-              <i class="el-icon-hot-water"></i> 热门推荐
-            </el-button>
-            <el-button size="small" @click="loadLatestPoints">
-              <i class="el-icon-time"></i> 最新发布
-            </el-button>
-            <el-button size="small" @click="loadRecommendPoints">
-              <i class="el-icon-star-off"></i> 精选推荐
-            </el-button>
-            <el-button size="small" @click="viewMyCollects">
+      <!-- Tab标签页导航 -->
+      <div class="tab-nav">
+        <el-tabs v-model="activeTab" @tab-click="handleTabClick">
+          <el-tab-pane label="推荐" name="recommend">
+            <span slot="label"><i class="el-icon-magic-stick"></i> 智能推荐</span>
+          </el-tab-pane>
+          <el-tab-pane label="最新" name="latest">
+            <span slot="label"><i class="el-icon-time"></i> 最新发布</span>
+          </el-tab-pane>
+          <el-tab-pane label="热门" name="hot">
+            <span slot="label"><i class="el-icon-trophy"></i> 经典榜单</span>
+          </el-tab-pane>
+          <el-tab-pane name="myArticles">
+            <span slot="label" style="display: inline-flex; align-items: center;">
+              <i class="el-icon-tickets"></i> 我的文章
+              <el-badge v-if="myArticleCount > 0" :value="myArticleCount" class="badge-item" type="primary" />
+            </span>
+          </el-tab-pane>
+          <el-tab-pane label="我的收藏" name="myCollects">
+            <span slot="label" style="display: inline-flex; align-items: center;">
               <i class="el-icon-folder"></i> 我的收藏
-            </el-button>
-          </el-button-group>
-        </div>
+              <el-badge v-if="myCollectCount > 0" :value="myCollectCount" class="badge-item" type="warning" />
+            </span>
+          </el-tab-pane>
+        </el-tabs>
         
-        <div class="nav-right">
-          <el-button type="success" size="small" @click="goPublish">
-            <i class="el-icon-edit"></i> 发布知识点
+        <div class="tab-actions">
+          <el-button type="primary" size="small" icon="el-icon-edit" @click="goPublish">
+            发布知识点
           </el-button>
         </div>
+      </div>
+
+      <!-- 筛选条件 -->
+      <div class="filter-section">
+        <el-row :gutter="15">
+          <el-col :span="6">
+            <el-select v-model="filterParams.subjectId" placeholder="全部科目" clearable size="small" @change="applyFilter">
+              <el-option label="全部科目" :value="null"></el-option>
+              <el-option v-for="subject in subjectList" :key="subject.subjectId" :label="subject.subjectName" :value="subject.subjectId"></el-option>
+            </el-select>
+          </el-col>
+          <el-col :span="5">
+            <el-select v-model="filterParams.difficulty" placeholder="难度" clearable size="small" @change="applyFilter">
+              <el-option label="全部难度" :value="null"></el-option>
+              <el-option label="简单" :value="1"></el-option>
+              <el-option label="中等" :value="2"></el-option>
+              <el-option label="困难" :value="3"></el-option>
+            </el-select>
+          </el-col>
+          <el-col :span="5" v-if="activeTab === 'myArticles'">
+            <el-select v-model="filterParams.status" placeholder="状态" clearable size="small" @change="applyFilter">
+              <el-option label="全部状态" :value="null"></el-option>
+              <el-option label="草稿" :value="0"></el-option>
+              <el-option label="已发布" :value="1"></el-option>
+              <el-option label="已下架" :value="2"></el-option>
+            </el-select>
+          </el-col>
+          <el-col :span="5">
+            <el-select v-model="filterParams.orderBy" placeholder="排序" size="small" @change="applyFilter">
+              <el-option label="最新发布" value="create_time"></el-option>
+              <el-option label="最多浏览" value="view_count"></el-option>
+              <el-option label="最多点赞" value="like_count"></el-option>
+              <el-option label="最多收藏" value="collect_count"></el-option>
+            </el-select>
+          </el-col>
+          <el-col :span="3">
+            <el-button size="small" icon="el-icon-refresh" @click="resetFilter">重置</el-button>
+          </el-col>
+        </el-row>
       </div>
 
       <div v-loading="loading" class="point-list">
@@ -67,7 +117,9 @@
               </el-tag>
             </div>
             <div class="header-right">
-              <el-button :type="point.isLiked ? 'danger' : ''" size="mini" icon="el-icon-star-off" circle @click.stop="handleLike(point)" />
+              <el-button v-if="point.authorId === currentUserId" type="success" size="mini" icon="el-icon-edit" @click.stop="handleEdit(point)">编辑</el-button>
+              <el-button v-if="point.authorId === currentUserId" type="danger" size="mini" icon="el-icon-delete" @click.stop="handleDelete(point)">删除</el-button>
+              <el-button :type="point.isLiked ? 'primary' : ''" size="mini" icon="el-icon-thumb" circle @click.stop="handleLike(point)" />
               <el-button :type="point.isCollected ? 'warning' : ''" size="mini" icon="el-icon-folder" circle @click.stop="handleCollect(point)" />
             </div>
           </div>
@@ -79,11 +131,10 @@
           <div class="item-footer">
             <div class="footer-left">
               <el-tag size="mini" effect="plain">{{ point.subjectName }}</el-tag>
-              <el-tag size="mini" effect="plain" type="info">{{ point.chapterName }}</el-tag>
             </div>
             <div class="footer-right">
               <span class="stat-item"><i class="el-icon-view"></i> {{ point.viewCount }}</span>
-              <span class="stat-item"><i class="el-icon-star-off"></i> {{ point.likeCount }}</span>
+              <span class="stat-item"><i class="el-icon-thumb"></i> {{ point.likeCount }}</span>
               <span class="stat-item"><i class="el-icon-folder"></i> {{ point.collectCount }}</span>
               <span class="time"><i class="el-icon-time"></i> {{ formatTime(point.createTime) }}</span>
             </div>
@@ -99,7 +150,7 @@
 </template>
 
 <script>
-import { getSubjectList, getChapterTree, getKnowledgePointList, getHotPoints, getLatestPoints, getRecommendPoints, toggleLike, toggleCollect } from '@/api/knowledge'
+import { getSubjectList, getKnowledgePointList, getHotPoints, getLatestPoints, getRecommendPoints, toggleLike, toggleCollect, getMyCollects, deleteKnowledgePoint } from '@/api/knowledge'
 
 export default {
   name: 'KnowledgeLibrary',
@@ -107,47 +158,40 @@ export default {
     return {
       loading: false,
       subjectList: [],
-      chapterList: [],
       pointList: [],
       currentPage: 1,
       pageSize: 10,
       total: 0,
-      queryParams: { subjectId: null, chapterId: null, title: '' }
+      queryParams: { subjectId: null, difficulty: null, title: '' },
+      myArticleCount: 0,
+      myCollectCount: 0,
+      totalKnowledgeCount: 0,
+      activeTab: 'recommend',
+      filterParams: {
+        subjectId: null,
+        difficulty: null,
+        status: null,
+        orderBy: 'create_time'
+      }
     }
   },
   created() {
     this.loadSubjects()
-    this.loadPointList()
+    this.loadMyArticleCount()
+    this.loadMyCollectCount()
+    this.loadTotalKnowledgeCount()
+    this.loadDataByTab()
+  },
+  computed: {
+    currentUserId() {
+      return this.$store.getters.userId
+    }
   },
   methods: {
     loadSubjects() {
       getSubjectList().then(response => {
         this.subjectList = response.data || []
       })
-    },
-    handleSubjectChange(subjectId) {
-      this.queryParams.chapterId = null
-      this.chapterList = []
-      if (subjectId) {
-        this.loadChapters(subjectId)
-      }
-      this.loadPointList()
-    },
-    loadChapters(subjectId) {
-      getChapterTree(subjectId).then(response => {
-        this.chapterList = this.flattenTree(response.data || [])
-      })
-    },
-    flattenTree(tree, prefix = '') {
-      let result = []
-      tree.forEach(node => {
-        const label = prefix ? `${prefix} > ${node.chapterName}` : node.chapterName
-        result.push({ chapterId: node.chapterId, chapterName: label })
-        if (node.children && node.children.length > 0) {
-          result = result.concat(this.flattenTree(node.children, label))
-        }
-      })
-      return result
     },
     loadPointList() {
       this.loading = true
@@ -159,35 +203,55 @@ export default {
         this.loading = false
       })
     },
+    handleTabClick(tab) {
+      this.currentPage = 1
+      this.resetFilter()
+      this.loadDataByTab()
+    },
+    loadDataByTab() {
+      switch (this.activeTab) {
+        case 'hot':
+          this.loadHotPoints()
+          break
+        case 'latest':
+          this.loadLatestPoints()
+          break
+        case 'recommend':
+          this.loadRecommendPoints()
+          break
+        case 'myArticles':
+          this.loadMyArticles()
+          break
+        case 'myCollects':
+          this.loadMyCollects()
+          break
+        default:
+          this.loadRecommendPoints()
+      }
+    },
     loadHotPoints() {
       this.loading = true
-      this.queryParams = { subjectId: null, chapterId: null, title: '' }
       getHotPoints(10).then(response => {
         this.pointList = response.data || []
         this.total = this.pointList.length
-        this.currentPage = 1
       }).finally(() => {
         this.loading = false
       })
     },
     loadLatestPoints() {
       this.loading = true
-      this.queryParams = { subjectId: null, chapterId: null, title: '' }
       getLatestPoints(10).then(response => {
         this.pointList = response.data || []
         this.total = this.pointList.length
-        this.currentPage = 1
       }).finally(() => {
         this.loading = false
       })
     },
     loadRecommendPoints() {
       this.loading = true
-      this.queryParams = { subjectId: null, chapterId: null, title: '' }
       getRecommendPoints(10).then(response => {
         this.pointList = response.data || []
         this.total = this.pointList.length
-        this.currentPage = 1
       }).finally(() => {
         this.loading = false
       })
@@ -221,12 +285,125 @@ export default {
         this.$message.error('操作失败，请先登录')
       })
     },
-    viewMyCollects() {
-      this.$router.push({ name: 'knowledgeCollects' })
+    loadMyCollects() {
+      if (!this.currentUserId) {
+        this.$message.warning('请先登录')
+        this.$router.push('/login')
+        return
+      }
+      this.loading = true
+      getMyCollects().then(response => {
+        this.pointList = response.data || []
+        this.total = this.pointList.length
+        this.myCollectCount = this.pointList.length
+      }).catch(() => {
+        this.$message.error('加载失败')
+      }).finally(() => {
+        this.loading = false
+      })
+    },
+    goPublish() {
+      this.$router.push({ name: 'knowledgePublish' })
+    },
+    loadMyArticles() {
+      if (!this.currentUserId) {
+        this.$message.warning('请先登录')
+        this.$router.push('/login')
+        return
+      }
+      this.loading = true
+      const params = {
+        pageNum: this.currentPage,
+        pageSize: this.pageSize,
+        authorId: this.currentUserId,
+        ...this.filterParams
+      }
+      getKnowledgePointList(params).then(response => {
+        this.pointList = response.rows || []
+        this.total = response.total || 0
+      }).catch(() => {
+        this.$message.error('加载失败')
+      }).finally(() => {
+        this.loading = false
+      })
+    },
+    applyFilter() {
+      this.currentPage = 1
+      this.loadDataByTab()
+    },
+    resetFilter() {
+      this.filterParams = {
+        subjectId: null,
+        difficulty: null,
+        status: null,
+        orderBy: 'create_time'
+      }
+    },
+    loadMyArticleCount() {
+      const userId = this.$store.getters.userId
+      if (!userId) {
+        return
+      }
+      const params = {
+        pageNum: 1,
+        pageSize: 1,
+        authorId: userId
+      }
+      getKnowledgePointList(params).then(response => {
+        this.myArticleCount = response.total || 0
+      }).catch(() => {
+        // 静默失败
+      })
+    },
+    loadMyCollectCount() {
+      const userId = this.$store.getters.userId
+      if (!userId) {
+        return
+      }
+      getMyCollects().then(response => {
+        this.myCollectCount = response.data ? response.data.length : 0
+      }).catch(() => {
+        // 静默失败
+      })
+    },
+    loadTotalKnowledgeCount() {
+      const params = {
+        pageNum: 1,
+        pageSize: 1
+      }
+      getKnowledgePointList(params).then(response => {
+        this.totalKnowledgeCount = response.total || 0
+      }).catch(() => {
+        // 静默失败
+      })
     },
     handlePageChange(page) {
       this.currentPage = page
-      this.loadPointList()
+      this.loadDataByTab()
+    },
+    handleEdit(point) {
+      this.$router.push({ name: 'knowledgePublish', query: { pointId: point.pointId } })
+    },
+    handleDelete(point) {
+      this.$confirm('确定要删除这个知识点吗？删除后无法恢复！', '删除确认', {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger'
+      }).then(() => {
+        this.deleteKnowledgePoint(point.pointId)
+      }).catch(() => {
+        // 用户取消删除
+      })
+    },
+    deleteKnowledgePoint(pointId) {
+      deleteKnowledgePoint(pointId).then(() => {
+        this.$message.success('删除成功')
+        // 重新加载数据
+        this.loadDataByTab()
+      }).catch(() => {
+        this.$message.error('删除失败')
+      })
     },
     getDifficultyName(difficulty) {
       const map = { 1: '简单', 2: '中等', 3: '困难' }
@@ -265,8 +442,32 @@ export default {
 .filter-bar .el-input {
   width: 100%;
 }
-.quick-nav {
+.tab-nav {
   margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tab-nav .el-tabs {
+  flex: 1;
+}
+.tab-actions {
+  margin-left: 20px;
+}
+.badge-item {
+  margin-left: 5px;
+}
+.total-badge {
+  margin-left: 10px;
+}
+.filter-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+.filter-section .el-select {
+  width: 100%;
 }
 .point-list {
   min-height: 400px;

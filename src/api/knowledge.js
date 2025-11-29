@@ -11,17 +11,6 @@ export function getSubjectList() {
 }
 
 /**
- * 查询章节树
- * @param {Number} subjectId 科目ID
- */
-export function getChapterTree(subjectId) {
-  return request({
-    url: `/student/knowledge/chapters/${subjectId}`,
-    method: 'get'
-  })
-}
-
-/**
  * 查询知识点列表（分页）
  * @param {Object} params 查询参数
  */
@@ -180,12 +169,83 @@ export function getSubjects() {
 }
 
 /**
- * 根据科目获取章节列表
- * @param {Number} subjectId 科目ID
+ * 创建新科目
+ * @param {Object} data 科目数据
  */
-export function getChaptersBySubject(subjectId) {
+export function createSubject(data) {
   return request({
-    url: `/student/knowledge/chapters/${subjectId}`,
+    url: '/student/knowledge/subject',
+    method: 'post',
+    data
+  })
+}
+
+// ==================== 收藏夹管理接口 ====================
+
+/**
+ * 获取用户的收藏夹列表
+ */
+export function getUserFolders() {
+  return request({
+    url: '/student/knowledge/folders',
     method: 'get'
+  })
+}
+
+/**
+ * 创建新收藏夹
+ * @param {Object} data 收藏夹数据
+ */
+export function createFolder(data) {
+  return request({
+    url: '/student/knowledge/folder',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 修改收藏夹
+ * @param {Object} data 收藏夹数据
+ */
+export function updateFolder(data) {
+  return request({
+    url: '/student/knowledge/folder/update',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 删除收藏夹
+ * @param {Number} folderId 收藏夹ID
+ */
+export function deleteFolder(folderId) {
+  return request({
+    url: `/student/knowledge/folder/${folderId}`,
+    method: 'delete'
+  })
+}
+
+/**
+ * 删除知识点
+ * @param {Number} pointId 知识点ID
+ */
+export function deleteKnowledgePoint(pointId) {
+  return request({
+    url: `/student/knowledge/point/${pointId}`,
+    method: 'delete'
+  })
+}
+
+/**
+ * 收藏知识点到指定收藏夹
+ * @param {Number} pointId 知识点ID
+ * @param {Number} folderId 收藏夹ID
+ */
+export function collectToFolder(pointId, folderId) {
+  return request({
+    url: `/student/knowledge/collect/${pointId}/folder/${folderId}`,
+    method: 'post'
   })
 }
