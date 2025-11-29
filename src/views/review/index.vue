@@ -967,6 +967,18 @@ export default {
           });
         });
       });
+    },
+
+    // 跳转到知识点详情页
+    gotoKnowledge(pointId) {
+      if (!pointId) {
+        this.$message.warning('知识点ID不存在')
+        return
+      }
+      this.$router.push({
+        name: 'knowledgeDetail',
+        params: { pointId }
+      })
     }
 
   }

@@ -805,12 +805,12 @@ export default {
 
 .editor-preview-container.fullscreen-mode {
   position: fixed;
-  top: 60px;
+  top: 47px;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 9999;
-  height: calc(100vh - 60px);
+  height: calc(100vh - 47px);
   background: #fff;
   border-top: none;
   overflow: hidden;
