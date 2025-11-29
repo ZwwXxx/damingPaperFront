@@ -2,12 +2,13 @@
   <div class="w-full">
     <!-- 顶部导航栏 start -->
 
-    <nav class="bg-gray-800 h-16 fixed w-full z-10  ">
+    <nav class="bg-gray-800 h-16 fixed w-full z-10 nav-bar" :class="{ 'nav-hidden': isNavHidden }">
       <div class="container mx-auto h-full flex justify-between items-center p-4">
         <div class="text-white text-lg font-semibold cursor-pointer" @click="goToUrl('/home')">Daming Paper</div>
         <div class="hidden md:flex space-x-4 items-center">
           <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white px-3 py-2">首页</a>
           <a href="#" @click="goToUrl('/forum/index')" class="block text-gray-300 hover:text-white px-3 py-2">论坛</a>
+          <a href="#" @click="goToUrl('/knowledge')" class="block text-gray-300 hover:text-white px-3 py-2">知识库</a>
           <a href="#" @click="goToUrl('/notice/list')" class="block text-gray-300 hover:text-white px-3 py-2">公告</a>
           <a href="#" @click="goToUrl('/feedback/submit')" class="block text-gray-300 hover:text-white px-3 py-2">反馈</a>
           <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white px-3 py-2">AI</a>
@@ -34,7 +35,9 @@
     <transition name="fade">
       <!-- Mobile Menu -->
       <div v-if="isMenuOpen" id="mobile-menu"
-           class="md:hidden bg-gray-800 absolute top-16 left-0 w-full z-30 ">
+           class="md:hidden bg-gray-800 absolute left-0 w-full z-30"
+           :class="{ 'mobile-menu-hidden': isNavHidden }"
+           :style="{ top: isNavHidden ? '0' : '64px' }">
         <div class="flex items-center p-4 border-b border-gray-700">
           <img
             :src="avatar"
@@ -50,6 +53,7 @@
         </div>
         <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white p-4">首页</a>
         <a href="#" @click="goToUrl('/forum/index')" class="block text-gray-300 hover:text-white p-4">论坛</a>
+        <a href="#" @click="goToUrl('/knowledge')" class="block text-gray-300 hover:text-white p-4">知识库</a>
         <a href="#" @click="goToUrl('/notice/list')" class="block text-gray-300 hover:text-white p-4">公告</a>
         <a href="#" @click="goToUrl('/feedback/submit')" class="block text-gray-300 hover:text-white p-4">反馈</a>
         <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white p-4">AI</a>
@@ -93,14 +97,23 @@ export default {
   mounted() {
     // 添加全局点击事件监听器
     document.addEventListener('click', this.handleClickOutside);
+    // 添加滚动事件监听器
+    this.scrollHandler = this.throttle(this.handleScroll, 16); // 约60fps
+    window.addEventListener('scroll', this.scrollHandler);
   },
   beforeDestroy() {
     // 移除全局点击事件监听器
     document.removeEventListener('click', this.handleClickOutside);
+    // 移除滚动事件监听器
+    window.removeEventListener('scroll', this.scrollHandler);
   },
   data() {
     return {
       isMenuOpen: false,
+      isNavHidden: false, // 导航栏是否隐藏
+      lastScrollTop: 0, // 上次滚动位置
+      scrollThreshold: 10, // 滚动阈值，避免小幅度滚动触发
+      scrollHandler: null
     };
   },
 
@@ -152,10 +165,88 @@ export default {
         this.isMenuOpen = false; // 收缩菜单
       }
     },
+    /** 处理页面滚动 */
+    handleScroll() {
+      // 如果移动端菜单展开，不处理导航栏隐藏
+      if (this.isMenuOpen) {
+        return;
+      }
+      
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      
+      // 在顶部时总是显示导航栏
+      if (scrollTop <= 100) {
+        this.isNavHidden = false;
+        this.lastScrollTop = scrollTop;
+        return;
+      }
+      
+      // 计算滚动差值
+      const scrollDiff = Math.abs(scrollTop - this.lastScrollTop);
+      
+      // 只有滚动超过阈值才处理
+      if (scrollDiff < this.scrollThreshold) {
+        return;
+      }
+      
+      // 向下滚动隐藏导航栏
+      if (scrollTop > this.lastScrollTop && !this.isNavHidden) {
+        this.isNavHidden = true;
+        // 同时关闭移动端菜单（如果打开的话）
+        if (this.isMenuOpen) {
+          this.isMenuOpen = false;
+        }
+      }
+      // 向上滚动显示导航栏
+      else if (scrollTop < this.lastScrollTop && this.isNavHidden) {
+        this.isNavHidden = false;
+      }
+      
+      this.lastScrollTop = scrollTop;
+    },
+    /** 节流函数 - 控制函数执行频率 */
+    throttle(func, limit) {
+      let lastFunc;
+      let lastRan;
+      return function() {
+        const context = this;
+        const args = arguments;
+        if (!lastRan) {
+          func.apply(context, args);
+          lastRan = Date.now();
+        } else {
+          clearTimeout(lastFunc);
+          lastFunc = setTimeout(function() {
+            if ((Date.now() - lastRan) >= limit) {
+              func.apply(context, args);
+              lastRan = Date.now();
+            }
+          }, limit - (Date.now() - lastRan));
+        }
+      };
+    }
   },
 };
 </script>
 <style scoped>
+/* 导航栏滚动隐藏动画 */
+.nav-bar {
+  transition: transform 0.1s ease-in-out;
+}
+
+.nav-bar.nav-hidden {
+  transform: translateY(-100%);
+}
+
+/* 移动端菜单样式调整 */
+#mobile-menu {
+  transition: top 0.3s ease-in-out;
+}
+
+.mobile-menu-hidden {
+  top: 0 !important;
+}
+
 /* 添加过渡效果的样式 */
 .fade-enter-active,
 .fade-leave-active {

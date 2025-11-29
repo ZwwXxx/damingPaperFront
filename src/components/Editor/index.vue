@@ -33,6 +33,7 @@ import "quill/dist/quill.snow.css";
 import "quill/dist/quill.bubble.css";
 import { getToken } from "@/utils/auth";
 import ElImageViewer from "element-ui/packages/image/src/image-viewer";
+import { validateUploadFile } from "@/utils/upload";
 
 export default {
   name: "Editor",
@@ -184,20 +185,11 @@ export default {
     },
     // 上传前校检格式和大小
     handleBeforeUpload(file) {
-      const type = ["image/jpeg", "image/jpg", "image/png", "image/svg"];
-      const isJPG = type.includes(file.type);
-      // 检验文件格式
-      if (!isJPG) {
-        this.$message.error(`图片格式错误!`);
+      // ⭐ 使用统一的文件验证
+      const validation = validateUploadFile(file);
+      if (!validation.valid) {
+        this.$message.error(validation.message);
         return false;
-      }
-      // 校检文件大小
-      if (this.fileSize) {
-        const isLt = file.size / 1024 / 1024 < this.fileSize;
-        if (!isLt) {
-          this.$message.error(`上传文件大小不能超过 ${this.fileSize} MB!`);
-          return false;
-        }
       }
       return true;
     },

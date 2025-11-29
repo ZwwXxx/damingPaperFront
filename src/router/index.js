@@ -99,6 +99,21 @@ const routes = [
                 path: '/forum/post',
                 name: 'forumPost',
                 component: () => import('@/views/forum/post.vue'),
+            },
+            {
+                path: '/knowledge',
+                name: 'knowledgeLibrary',
+                component: () => import('@/views/knowledge/index.vue'),
+            },
+            {
+                path: '/knowledge/detail/:pointId',
+                name: 'knowledgeDetail',
+                component: () => import('@/views/knowledge/detail.vue'),
+            },
+            {
+                path: '/knowledge/collects',
+                name: 'knowledgeCollects',
+                component: () => import('@/views/knowledge/collects.vue'),
             }
 
         ],

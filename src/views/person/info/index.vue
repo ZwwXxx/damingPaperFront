@@ -49,6 +49,7 @@ import store from "@/store";
 import { updateInfo, uploadFile } from "@/api/user";
 import { convertAvatarUrl } from "@/utils/oss";
 import { DEFAULT_AVATAR } from "@/utils/constants";
+import { validateUploadFile, formatFileSize } from "@/utils/upload";
 
 export default {
   name: "index",
@@ -115,13 +116,29 @@ export default {
      * <data>：实际的数据部分，通常是以 Base64 编码的字符串。
      */
     beforeAvatarUpload(file) {
-      if (file.type.indexOf("image/") == -1) {
-        this.$message.error("文件格式错误，请上传图片类型,如：JPG，PNG后缀的文件。");
+      // ⭐ 使用统一的文件验证
+      const validation = validateUploadFile(file);
+      if (!validation.valid) {
+        this.$message.error(validation.message);
+        return false;
+      }
+      
+      const imageConversion = require("image-conversion");
+      console.log('压缩前：' + formatFileSize(file.size));
+      
+      // 如果文件已经小于100KB，不压缩直接使用
+      if (file.size <= 100 * 1024) {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+          this.blob = file
+          this.options.img = reader.result;
+          this.options.filename = file.name;
+        };
       } else {
-        const imageConversion = require("image-conversion");
-        console.log('压缩前'+(file.size / 1024)+"K");
+        // 压缩到100KB以内
         imageConversion.compressAccurately(file, 100).then(res => {
-          console.log('压缩后'+(res.size / 1024)+"K");
+          console.log('压缩后：' + formatFileSize(res.size));
           const reader = new FileReader();
           reader.readAsDataURL(res);
           reader.onload = () => {
@@ -129,8 +146,13 @@ export default {
             this.options.img = reader.result;
             this.options.filename = file.name;
           };
-        })
+        }).catch(err => {
+          console.error('图片压缩失败:', err);
+          this.$message.error('图片处理失败，请重试');
+        });
       }
+      
+      return false; // 阻止默认上传，使用自定义上传
     },
     async handleSubmit() {
       // 在这里可以处理表单提交逻辑
