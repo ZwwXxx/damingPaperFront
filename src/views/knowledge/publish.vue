@@ -2,7 +2,7 @@
   <div class="knowledge-publish">
     <el-card class="box-card">
       <div slot="header" class="clearfix">
-        <span class="title">📝 发布知识点</span>
+        <span class="title">📝 {{ isEdit ? '编辑知识点' : '发布知识点' }}</span>
         <div class="header-buttons">
           <el-button size="small" icon="el-icon-back" @click="goBack">返回</el-button>
         </div>
@@ -130,51 +130,40 @@
               </el-form-item>
 
               <el-form-item label="科目" prop="subjectId">
-                <div class="subject-selector">
-                  <div class="selected-subjects" v-if="selectedSubjects.length > 0">
-                    <el-tag
-                      v-for="subject in selectedSubjects"
-                      :key="subject.subjectId"
-                      :closable="true"
-                      @close="removeSubject(subject)"
+                <div class="subject-tag-selector">
+                  <!-- 科目标签展示区域 -->
+                  <div class="subject-tags-container">
+                    <div class="tags-grid">
+                      <el-tag
+                        v-for="subject in subjectList"
+                        :key="subject.subjectId"
+                        :type="isSubjectSelected(subject.subjectId) ? 'primary' : 'info'"
+                        :effect="isSubjectSelected(subject.subjectId) ? 'dark' : 'plain'"
+                        class="subject-tag-item"
+                        @click="toggleSubject(subject)"
+                      >
+                        <i v-if="isSubjectSelected(subject.subjectId)" class="el-icon-check"></i>
+                        {{ subject.subjectName }}
+                      </el-tag>
+                    </div>
+                    
+                    <!-- 新建科目按钮 -->
+                    <el-button
                       type="primary"
-                      class="subject-tag"
+                      size="mini"
+                      plain
+                      icon="el-icon-plus"
+                      class="add-subject-btn"
+                      @click="showCreateSubjectDialog"
                     >
-                      {{ subject.subjectName }}
-                    </el-tag>
+                      新建科目
+                    </el-button>
                   </div>
                   
-                  <el-dropdown trigger="click" @command="handleSubjectCommand" class="subject-dropdown">
-                    <el-button size="small" type="primary" plain>
-                      <i class="el-icon-plus"></i>
-                      {{ selectedSubjects.length > 0 ? '添加科目' : '选择科目' }}
-                    </el-button>
-                    <el-dropdown-menu slot="dropdown">
-                      <div class="subject-menu">
-                        <div class="subject-header">选择科目</div>
-                        <div class="subject-options">
-                          <el-dropdown-item
-                            v-for="subject in availableSubjects"
-                            :key="subject.subjectId"
-                            :command="`select-${subject.subjectId}`"
-                            class="subject-option"
-                          >
-                            <div class="subject-info">
-                              <span class="subject-name">{{ subject.subjectName }}</span>
-                              <span class="subject-desc">{{ subject.description || '暂无描述' }}</span>
-                            </div>
-                          </el-dropdown-item>
-                          <div v-if="availableSubjects.length === 0" class="no-subjects">
-                            <span>暂无可选科目</span>
-                          </div>
-                        </div>
-                        <el-divider style="margin: 8px 0;"></el-divider>
-                        <el-dropdown-item command="create-subject" class="create-subject-item">
-                          <i class="el-icon-plus"></i> 新建科目
-                        </el-dropdown-item>
-                      </div>
-                    </el-dropdown-menu>
-                  </el-dropdown>
+                  <!-- 已选科目提示 -->
+                  <div v-if="selectedSubjects.length > 0" class="selected-info">
+                    已选择 {{ selectedSubjects.length }} 个科目
+                  </div>
                 </div>
               </el-form-item>
 
@@ -186,11 +175,11 @@
                 </el-select>
               </el-form-item>
 
-              <el-form-item label="摘要" prop="summary">
+              <el-form-item label="摘要">
                 <el-input
                   type="textarea"
                   v-model="form.summary"
-                  placeholder="请简要描述知识点内容"
+                  placeholder="不填则自动从内容开头提取摘要"
                   :rows="6"
                 />
               </el-form-item>
@@ -198,8 +187,8 @@
               <!-- 提交按钮 -->
               <div class="submit-actions">
                 <el-button type="primary" @click="handleSubmit" :loading="submitting" style="width: 100%; margin-bottom: 10px;">
-                  <i class="el-icon-upload"></i>
-                  发布知识点
+                  <i :class="isEdit ? 'el-icon-check' : 'el-icon-upload'"></i>
+                  {{ isEdit ? '更新知识点' : '发布知识点' }}
                 </el-button>
                 <el-button @click="handleReset" style="width: 100%;">
                   <i class="el-icon-refresh"></i>
@@ -233,12 +222,15 @@
 </template>
 
 <script>
-import { getSubjects, publishKnowledge, createSubject } from '@/api/knowledge'
+import { getSubjects, publishKnowledge, createSubject, getKnowledgeDetail, updateKnowledge } from '@/api/knowledge'
 
 export default {
   name: 'KnowledgePublish',
   data() {
     return {
+      isEdit: false,
+      editId: null,
+      fromPage: 'knowledge', // 来源页面，默认为知识库
       form: {
         title: '',
         subjectId: null,
@@ -256,9 +248,6 @@ export default {
         ],
         difficulty: [
           { required: true, message: '请选择难度等级', trigger: 'change' }
-        ],
-        summary: [
-          { required: true, message: '请输入内容摘要', trigger: 'blur' }
         ],
         content: [
           { required: true, message: '请输入详细内容', trigger: 'blur' },
@@ -284,8 +273,46 @@ export default {
   mounted() {
     this.loadSubjects()
     this.initScrollSync()
+    this.checkEditMode()
   },
   methods: {
+    checkEditMode() {
+      const pointId = this.$route.query.pointId
+      const from = this.$route.query.from
+      
+      if (pointId) {
+        this.isEdit = true
+        this.editId = pointId
+        this.fromPage = from || 'knowledge'
+        this.loadKnowledgeDetail(pointId)
+      }
+    },
+    async loadKnowledgeDetail(pointId) {
+      try {
+        const res = await getKnowledgeDetail(pointId)
+        if (res.code === 200 && res.data) {
+          const data = res.data
+          this.form = {
+            title: data.title || '',
+            subjectId: data.subjectId || null,
+            difficulty: data.difficulty || null,
+            summary: data.summary || '',
+            content: data.content || ''
+          }
+          
+          // 如果有科目信息，同步到 selectedSubjects
+          if (data.subjectId) {
+            const subject = this.subjectList.find(s => s.subjectId === data.subjectId)
+            if (subject && !this.isSubjectSelected(data.subjectId)) {
+              this.selectedSubjects = [subject]
+            }
+          }
+        }
+      } catch (error) {
+        console.error('获取知识点详情失败:', error)
+        this.$message.error('获取知识点详情失败')
+      }
+    },
     async loadSubjects() {
       try {
         const res = await getSubjects()
@@ -295,6 +322,26 @@ export default {
       } catch (error) {
         console.error('获取科目列表失败:', error)
       }
+    },
+    
+    // 判断科目是否已选中
+    isSubjectSelected(subjectId) {
+      return this.selectedSubjects.some(s => s.subjectId === subjectId)
+    },
+    
+    // 切换科目选择状态
+    toggleSubject(subject) {
+      const index = this.selectedSubjects.findIndex(s => s.subjectId === subject.subjectId)
+      if (index > -1) {
+        // 已选中，取消选中
+        this.selectedSubjects.splice(index, 1)
+      } else {
+        // 未选中，添加选中
+        this.selectedSubjects.push(subject)
+      }
+      
+      // 更新表单的 subjectId 字段（取第一个选中的科目）
+      this.form.subjectId = this.selectedSubjects.length > 0 ? this.selectedSubjects[0].subjectId : null
     },
 
     insertMarkdown(prefix, suffix) {
@@ -318,15 +365,28 @@ export default {
         if (valid) {
           this.submitting = true
           try {
-            const res = await publishKnowledge(this.form)
-            if (res.code === 200) {
-              this.successDialogVisible = true
+            let res
+            if (this.isEdit) {
+              // 编辑模式，调用更新接口
+              res = await updateKnowledge(this.editId, this.form)
             } else {
-              this.$message.error(res.msg || '发布失败')
+              // 新增模式，调用发布接口
+              res = await publishKnowledge(this.form)
+            }
+            
+            if (res.code === 200) {
+              if (this.isEdit) {
+                this.$message.success('更新成功')
+                this.goBackToSource()
+              } else {
+                this.successDialogVisible = true
+              }
+            } else {
+              this.$message.error(res.msg || (this.isEdit ? '更新失败' : '发布失败'))
             }
           } catch (error) {
-            console.error('发布失败:', error)
-            this.$message.error('发布失败，请重试')
+            console.error('操作失败:', error)
+            this.$message.error((this.isEdit ? '更新失败' : '发布失败') + '，请重试')
           } finally {
             this.submitting = false
           }
@@ -339,7 +399,15 @@ export default {
     },
 
     goBack() {
-      this.$router.go(-1)
+      this.goBackToSource()
+    },
+    
+    goBackToSource() {
+      if (this.fromPage === 'myArticles') {
+        this.$router.push({ path: '/knowledge', query: { tab: 'myArticles' } })
+      } else {
+        this.$router.push('/knowledge')
+      }
     },
 
     goToKnowledgeList() {
@@ -469,32 +537,23 @@ export default {
     // 创建新科目
     async createNewSubject(subjectName) {
       try {
-        // 这里需要添加创建科目的API调用
-        const response = await this.createSubject({
-          subjectName: subjectName,
-          description: '',
-          status: 1
-        })
-        if (response.code === 200) {
-          this.$message.success('创建科目成功')
+        const res = await createSubject({ subjectName })
+        if (res.code === 200) {
+          this.$message.success('科目创建成功')
           // 重新加载科目列表
           await this.loadSubjects()
-          // 自动选择新创建的科目
+          // 自动选中新创建的科目
           const newSubject = this.subjectList.find(s => s.subjectName === subjectName)
           if (newSubject) {
-            this.selectSubject(newSubject.subjectId)
+            this.toggleSubject(newSubject)
           }
         } else {
-          this.$message.error(response.msg || '创建失败')
+          this.$message.error(res.msg || '科目创建失败')
         }
       } catch (error) {
-        this.$message.error('创建失败：' + error.message)
+        console.error('创建科目失败:', error)
+        this.$message.error('创建科目失败，请重试')
       }
-    },
-
-    // 创建科目API调用
-    async createSubject(subjectData) {
-      return await createSubject(subjectData)
     }
   },
 
@@ -541,6 +600,8 @@ export default {
   display: flex;
   gap: 20px;
   align-items: flex-start;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .editor-container {
@@ -554,7 +615,7 @@ export default {
 }
 
 .settings-container {
-  width: 350px;
+  width: 400px;
   flex-shrink: 0;
 }
 
@@ -572,14 +633,19 @@ export default {
 .settings-title {
   margin: 0 0 20px 0;
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 600;
   color: #303133;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #409eff;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f0f0f0;
 }
 
+/* 表单项间距优化 */
 .settings-wrapper .el-form-item {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.settings-wrapper .el-form-item:last-of-type {
+  margin-bottom: 16px;
 }
 
 .settings-wrapper >>> .el-form-item__label {
@@ -896,6 +962,83 @@ export default {
 .subject-dropdown .el-button:hover {
   border-color: #409eff;
   color: #409eff;
+}
+
+/* 标签式科目选择器样式 */
+.subject-tag-selector {
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.subject-tags-container {
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  padding: 16px;
+  background: #fafbfc;
+  min-height: 80px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.tags-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  align-items: flex-start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.subject-tag-item {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin: 0 !important;
+  height: auto;
+  line-height: 1.4;
+  font-size: 13px;
+  border-radius: 16px;
+  padding: 6px 12px;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  max-width: calc(100% - 16px);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.subject-tag-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 12px rgba(64, 158, 255, 0.25);
+}
+
+.subject-tag-item .el-icon-check {
+  margin-right: 4px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.add-subject-btn {
+  height: auto;
+  padding: 6px 12px;
+  border-radius: 16px;
+  border-style: dashed;
+  font-size: 13px;
+}
+
+.selected-info {
+  margin-top: 12px;
+  padding: 8px;
+  font-size: 12px;
+  color: #606266;
+  text-align: center;
+  background: rgba(64, 158, 255, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(64, 158, 255, 0.2);
 }
 
 /* 科目下拉菜单样式 */

@@ -93,11 +93,13 @@ export function toggleCollect(pointId) {
 
 /**
  * 获取我的收藏列表
+ * @param {Object} params 查询参数，包含folderId等
  */
-export function getMyCollects() {
+export function getMyCollects(params = {}) {
   return request({
     url: '/student/knowledge/my/collects',
-    method: 'get'
+    method: 'get',
+    params
   })
 }
 
@@ -176,6 +178,30 @@ export function createSubject(data) {
   return request({
     url: '/student/knowledge/subject',
     method: 'post',
+    data
+  })
+}
+
+/**
+ * 获取知识点详情（用于编辑）
+ * @param {Number} pointId 知识点ID
+ */
+export function getKnowledgeDetail(pointId) {
+  return request({
+    url: `/student/knowledge/point/${pointId}/edit`,
+    method: 'get'
+  })
+}
+
+/**
+ * 更新知识点
+ * @param {Number} pointId 知识点ID
+ * @param {Object} data 知识点数据
+ */
+export function updateKnowledge(pointId, data) {
+  return request({
+    url: `/student/knowledge/point/${pointId}`,
+    method: 'put',
     data
   })
 }

@@ -404,9 +404,13 @@ export default {
     }
   },
   created() {
-    const pointId = this.$route.params.pointId
+    // 支持两种方式传参：params.pointId 或 query.id
+    const pointId = this.$route.params.pointId || this.$route.query.id
+    console.log('知识点ID:', pointId, 'params:', this.$route.params, 'query:', this.$route.query)
     if (pointId) {
       this.loadDetail(pointId)
+    } else {
+      console.error('未获取到知识点ID')
     }
   },
   mounted() {
@@ -563,7 +567,7 @@ export default {
     },
     /** 返回 */
     goBack() {
-      this.$router.back()
+      this.$router.push('/knowledge')
     },
     /** 获取难度名称 */
     getDifficultyName(difficulty) {
