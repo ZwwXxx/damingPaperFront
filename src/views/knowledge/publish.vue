@@ -14,7 +14,7 @@
           <div class="editor-container">
             <div class="editor-wrapper">
               <div class="markdown-editor">
-                <div class="editor-toolbar">
+                <div class="editor-toolbar" :class="{ 'fullscreen-toolbar': isFullscreen }">
                   <div class="toolbar-groups">
                     <!-- 文本格式 -->
                     <el-button-group size="small">
@@ -79,6 +79,9 @@
                       <el-button @click="insertMarkdown('==', '==')" title="高亮">
                         <i class="el-icon-star-on"></i>
                       </el-button>
+                      <el-button @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏编辑'">
+                        <i :class="isFullscreen ? 'el-icon-copy-document' : 'el-icon-full-screen'"></i>
+                      </el-button>
                     </el-button-group>
                   </div>
                   
@@ -86,10 +89,17 @@
                 </div>
 
                 <!-- 编辑和预览并排显示 -->
-                <div class="editor-preview-container">
+                <div class="editor-preview-container" :class="{ 'fullscreen-mode': isFullscreen }">
                   <!-- 编辑区域 -->
-                  <div class="editor-area">
-                    <div class="area-header">编辑</div>
+                  <div class="editor-area" :class="{ 'fullscreen-editor': isFullscreen }">
+                    <div class="area-header">
+                      编辑
+                      <div v-if="isFullscreen" class="fullscreen-actions">
+                        <el-button size="mini" type="text" @click="toggleFullscreen">
+                          <i class="el-icon-copy-document"></i> 退出全屏
+                        </el-button>
+                      </div>
+                    </div>
                     <el-input
                       ref="contentEditor"
                       type="textarea"
@@ -259,7 +269,8 @@ export default {
       submitting: false,
       successDialogVisible: false,
       scrollSyncing: false,
-      scrollTimeout: null
+      scrollTimeout: null,
+      isFullscreen: false
     }
   },
   computed: {
@@ -274,6 +285,7 @@ export default {
     this.loadSubjects()
     this.initScrollSync()
     this.checkEditMode()
+    this.addKeyboardListeners()
   },
   methods: {
     checkEditMode() {
@@ -554,6 +566,45 @@ export default {
         console.error('创建科目失败:', error)
         this.$message.error('创建科目失败，请重试')
       }
+    },
+
+    // 切换全屏模式
+    toggleFullscreen() {
+      this.isFullscreen = !this.isFullscreen
+      
+      if (this.isFullscreen) {
+        // 进入全屏时禁用body滚动
+        document.body.style.overflow = 'hidden'
+      } else {
+        // 退出全屏时恢复body滚动
+        document.body.style.overflow = ''
+      }
+      
+      this.$nextTick(() => {
+        const textarea = this.$refs.contentEditor?.$refs?.textarea
+        if (textarea) {
+          textarea.focus()
+        }
+      })
+    },
+
+    // 添加键盘监听器
+    addKeyboardListeners() {
+      document.addEventListener('keydown', this.handleKeydown)
+    },
+
+    // 处理键盘事件
+    handleKeydown(event) {
+      // Esc 键退出全屏
+      if (event.key === 'Escape' && this.isFullscreen) {
+        this.toggleFullscreen()
+        event.preventDefault()
+      }
+      // F11 切换全屏
+      if (event.key === 'F11') {
+        this.toggleFullscreen()
+        event.preventDefault()
+      }
     }
   },
 
@@ -564,6 +615,9 @@ export default {
       editorEl.removeEventListener('scroll', this.handleEditorScroll)
     }
     clearTimeout(this.scrollTimeout)
+    document.removeEventListener('keydown', this.handleKeydown)
+    // 恢复body滚动
+    document.body.style.overflow = ''
   }
 }
 </script>
@@ -732,10 +786,34 @@ export default {
   white-space: nowrap;
 }
 
+.editor-toolbar.fullscreen-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #f8f9fa;
+  border-bottom: none;
+  box-shadow: none;
+}
+
 .editor-preview-container {
   display: flex;
   height: calc(100vh - 250px);
   border-top: 1px solid #dcdfe6;
+}
+
+.editor-preview-container.fullscreen-mode {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  height: calc(100vh - 60px);
+  background: #fff;
+  border-top: none;
+  overflow: hidden;
 }
 
 .editor-area,
@@ -750,6 +828,10 @@ export default {
   border-right: 1px solid #dcdfe6;
 }
 
+.editor-area.fullscreen-editor {
+  border-right: 1px solid #dcdfe6;
+}
+
 .area-header {
   padding: 10px 15px;
   background: #f5f7fa;
@@ -759,6 +841,24 @@ export default {
   color: #606266;
   letter-spacing: 0.5px;
   flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fullscreen-actions {
+  display: flex;
+  align-items: center;
+}
+
+.fullscreen-actions .el-button {
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.fullscreen-actions .el-button:hover {
+  color: #409eff;
 }
 
 .markdown-textarea {

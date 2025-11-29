@@ -333,7 +333,8 @@
 
 <script>
 import {
-  getKnowledgePointDetail,
+  getKnowledgePointBase,
+  getKnowledgePointContent,
   toggleLike,
   toggleCollect,
   getKnowledgeComments,
@@ -341,8 +342,8 @@ import {
   deleteKnowledgeComment,
   toggleCommentLike,
   getUserFolders,
-  createFolder,
-  collectToFolder
+  collectToFolder,
+  createFolder
 } from '@/api/knowledge'
 import { marked } from 'marked'
 import { mapGetters } from 'vuex'
@@ -425,26 +426,49 @@ export default {
     window.removeEventListener('resize', this.resizeCate)
   },
   methods: {
-    /** 加载详情 */
-    loadDetail(pointId) {
+    /** 加载详情 - 优化的分步查询方案 */
+    async loadDetail(pointId) {
       this.loading = true
-      getKnowledgePointDetail(pointId)
-        .then(response => {
-          this.pointDetail = response.data
+      
+      try {
+        // 方案1: 如果从列表页传入了基础数据，直接使用
+        if (this.$route.params.baseData) {
+          this.pointDetail = { ...this.$route.params.baseData }
+          console.log('使用列表传入的基础数据')
+        } 
+        // 方案2: 直接访问详情页，先获取基础信息
+        else {
+          console.log('直接访问详情页，获取基础信息')
+          const baseResponse = await getKnowledgePointBase(pointId)
+          this.pointDetail = baseResponse.data
+        }
+        
+        // 异步加载内容详情（大字段）
+        const contentResponse = await getKnowledgePointContent(pointId)
+        
+        // 前端组装完整数据
+        this.pointDetail = {
+          ...this.pointDetail,
+          content: contentResponse.data.content,
+          contentHtml: contentResponse.data.contentHtml,
+          auditRemark: contentResponse.data.auditRemark
+        }
+        
+        console.log('详情数据加载完成', this.pointDetail)
+        
+      } catch (error) {
+        console.error('加载失败:', error)
+        this.$message.error('加载失败')
+        this.$router.back()
+      } finally {
+        this.loading = false
+        // 等待 DOM 渲染后生成目录
+        this.$nextTick(() => {
+          this.getTitles()
         })
-        .catch(() => {
-          this.$message.error('加载失败')
-          this.$router.back()
-        })
-        .finally(() => {
-          this.loading = false
-          // 等待 DOM 渲染后生成目录
-          this.$nextTick(() => {
-            this.getTitles()
-          })
-          // 加载评论
-          this.loadComments()
-        })
+        // 加载评论
+        this.loadComments()
+      }
     },
     /** 点赞 */
     handleLike() {

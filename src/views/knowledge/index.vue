@@ -2,46 +2,15 @@
   <div class="knowledge-library">
     <el-card class="box-card">
       <div slot="header" class="clearfix">
-        <span class="title">📚 知识点库</span>
+        <span class="title">🌟 知识点广场</span>
         <el-badge v-if="totalKnowledgeCount > 0" :value="totalKnowledgeCount" class="total-badge" type="success" />
       </div>
 
-      <div class="filter-bar">
-        <el-row :gutter="20">
-          <el-col :span="6">
-            <el-select v-model="queryParams.subjectId" placeholder="选择科目" clearable @change="loadPointList">
-              <el-option v-for="subject in subjectList" :key="subject.subjectId" :label="subject.subjectName" :value="subject.subjectId" />
-            </el-select>
-          </el-col>
-          <el-col :span="5">
-            <el-select v-model="queryParams.difficulty" placeholder="难度" clearable @change="loadPointList">
-              <el-option label="简单" :value="1" />
-              <el-option label="中等" :value="2" />
-              <el-option label="困难" :value="3" />
-            </el-select>
-          </el-col>
-          <el-col :span="10">
-            <el-input v-model="queryParams.title" placeholder="搜索知识点标题" clearable @keyup.enter.native="loadPointList">
-              <el-button slot="append" icon="el-icon-search" @click="loadPointList" />
-            </el-input>
-          </el-col>
-          <el-col :span="3">
-            <el-button type="primary" @click="loadPointList">查询</el-button>
-          </el-col>
-        </el-row>
-      </div>
-
-      <!-- Tab标签页导航 -->
+      <!-- Tab导航 -->
       <div class="tab-nav">
         <el-tabs v-model="activeTab" @tab-click="handleTabClick">
-          <el-tab-pane label="推荐" name="recommend">
-            <span slot="label"><i class="el-icon-magic-stick"></i> 智能推荐</span>
-          </el-tab-pane>
-          <el-tab-pane label="最新" name="latest">
-            <span slot="label"><i class="el-icon-time"></i> 最新发布</span>
-          </el-tab-pane>
-          <el-tab-pane label="热门" name="hot">
-            <span slot="label"><i class="el-icon-trophy"></i> 经典榜单</span>
+          <el-tab-pane label="广场" name="plaza">
+            <span slot="label"><i class="el-icon-star-off"></i> 知识点广场</span>
           </el-tab-pane>
           <el-tab-pane name="myArticles">
             <span slot="label" style="display: inline-flex; align-items: center;">
@@ -64,8 +33,42 @@
         </div>
       </div>
 
-      <!-- 筛选条件 -->
-      <div class="filter-section">
+      <!-- 知识点广场筛选区（仅在广场tab显示） -->
+      <div v-if="activeTab === 'plaza'" class="plaza-filters">
+        <el-row :gutter="15" class="filter-row">
+          <el-col :span="5">
+            <el-select v-model="queryParams.subjectId" placeholder="全部科目" clearable @change="loadPointList">
+              <el-option v-for="subject in subjectList" :key="subject.subjectId" :label="subject.subjectName" :value="subject.subjectId" />
+            </el-select>
+          </el-col>
+          <el-col :span="4">
+            <el-select v-model="queryParams.difficulty" placeholder="全部难度" clearable @change="loadPointList">
+              <el-option label="简单" :value="1" />
+              <el-option label="中等" :value="2" />
+              <el-option label="困难" :value="3" />
+            </el-select>
+          </el-col>
+          <el-col :span="4">
+            <el-select v-model="queryParams.sortType" placeholder="排序方式" @change="loadPointList">
+              <el-option label="🎯 智能推荐" value="recommend" />
+              <el-option label="⏰ 最新发布" value="latest" />
+              <el-option label="🔥 热门榜单" value="hot" />
+            </el-select>
+          </el-col>
+          <el-col :span="11">
+            <el-input 
+              v-model="queryParams.title" 
+              placeholder="🔍 搜索知识点标题、内容..." 
+              clearable 
+              @keyup.enter.native="loadPointList"
+              prefix-icon="el-icon-search">
+              <el-button slot="append" type="primary" @click="loadPointList">搜索</el-button>
+            </el-input>
+          </el-col>
+        </el-row>
+      </div>
+      <!-- 我的文章筛选条件 -->
+      <div v-if="activeTab === 'myArticles'" class="filter-section">
         <el-row :gutter="15">
           <el-col :span="6">
             <el-select v-model="filterParams.subjectId" placeholder="全部科目" clearable size="small" @change="applyFilter">
@@ -73,7 +76,7 @@
               <el-option v-for="subject in subjectList" :key="subject.subjectId" :label="subject.subjectName" :value="subject.subjectId"></el-option>
             </el-select>
           </el-col>
-          <el-col :span="5">
+          <el-col :span="4">
             <el-select v-model="filterParams.difficulty" placeholder="难度" clearable size="small" @change="applyFilter">
               <el-option label="全部难度" :value="null"></el-option>
               <el-option label="简单" :value="1"></el-option>
@@ -81,7 +84,7 @@
               <el-option label="困难" :value="3"></el-option>
             </el-select>
           </el-col>
-          <el-col :span="5" v-if="activeTab === 'myArticles'">
+          <el-col :span="4">
             <el-select v-model="filterParams.status" placeholder="状态" clearable size="small" @change="applyFilter">
               <el-option label="全部状态" :value="null"></el-option>
               <el-option label="草稿" :value="0"></el-option>
@@ -89,7 +92,7 @@
               <el-option label="已下架" :value="2"></el-option>
             </el-select>
           </el-col>
-          <el-col :span="5">
+          <el-col :span="6">
             <el-select v-model="filterParams.orderBy" placeholder="排序" size="small" @change="applyFilter">
               <el-option label="最新发布" value="create_time"></el-option>
               <el-option label="最多浏览" value="view_count"></el-option>
@@ -97,7 +100,7 @@
               <el-option label="最多收藏" value="collect_count"></el-option>
             </el-select>
           </el-col>
-          <el-col :span="3">
+          <el-col :span="4">
             <el-button size="small" icon="el-icon-refresh" @click="resetFilter">重置</el-button>
           </el-col>
         </el-row>
@@ -141,7 +144,7 @@
             <div class="folder-actions">
               <i class="el-icon-arrow-right folder-arrow"></i>
               <!-- 只有非默认收藏夹才显示删除菜单 -->
-              <el-dropdown v-if="folder.isDefault !== 1" trigger="click" @command="handleFolderCommand" class="folder-menu">
+              <el-dropdown v-if="folder.isDefault !== 1" trigger="click" @command="handleFolderManageCommand" class="folder-menu">
                 <i class="el-icon-more"></i>
                 <el-dropdown-menu slot="dropdown">
                   <el-dropdown-item :command="{ action: 'edit', folder }">重命名</el-dropdown-item>
@@ -149,7 +152,7 @@
                 </el-dropdown-menu>
               </el-dropdown>
               <!-- 默认收藏夹只允许重命名 -->
-              <el-dropdown v-else trigger="click" @command="handleFolderCommand" class="folder-menu">
+              <el-dropdown v-else trigger="click" @command="handleFolderManageCommand" class="folder-menu">
                 <i class="el-icon-more"></i>
                 <el-dropdown-menu slot="dropdown">
                   <el-dropdown-item :command="{ action: 'edit', folder }">重命名</el-dropdown-item>
@@ -188,11 +191,11 @@
                 <div class="card-cover">
                   <div class="card-subject">{{ point.subjectName }}</div>
                   <div class="card-menu">
-                    <el-dropdown trigger="click" @command="(command) => handleKnowledgeCommand(command, point)">
+                    <el-dropdown trigger="click" @command="(command) => handleKnowledgeCommand(command, point)" @click.native.stop>
                       <i class="el-icon-more"></i>
                       <el-dropdown-menu slot="dropdown">
-                        <el-dropdown-item command="move">移动</el-dropdown-item>
-                        <el-dropdown-item command="remove" class="delete-item">移除</el-dropdown-item>
+                        <el-dropdown-item command="move">移动到其他收藏夹</el-dropdown-item>
+                        <el-dropdown-item command="remove" class="delete-item">移出收藏</el-dropdown-item>
                       </el-dropdown-menu>
                     </el-dropdown>
                   </div>
@@ -241,7 +244,49 @@
               <el-button v-if="activeTab === 'myArticles' || point.authorId === currentUserId" type="success" size="mini" icon="el-icon-edit" @click.stop="handleEdit(point)">编辑</el-button>
               <el-button v-if="activeTab === 'myArticles' || point.authorId === currentUserId" type="danger" size="mini" icon="el-icon-delete" @click.stop="handleDelete(point)">删除</el-button>
               <el-button :type="point.isLiked ? 'primary' : ''" size="mini" icon="el-icon-thumb" circle @click.stop="handleLike(point)" />
-              <el-button :type="point.isCollected ? 'warning' : ''" size="mini" icon="el-icon-folder" circle @click.stop="handleCollect(point)" />
+              <el-dropdown 
+                trigger="click" 
+                @command="(command) => handleFolderCommand(command, point)" 
+                @visible-change="(visible) => onCollectDropdownChange(visible, point)"
+                placement="bottom-end"
+              >
+                <el-button
+                  :type="point.isCollected ? 'warning' : ''"
+                  :icon="point.isCollected ? 'el-icon-folder-checked' : 'el-icon-folder'"
+                  size="mini"
+                  circle
+                  @click.stop
+                />
+                <el-dropdown-menu slot="dropdown">
+                  <div class="collect-folder-menu">
+                    <div class="folder-header">选择收藏夹</div>
+                    <div v-if="userFolders.length === 0" class="no-folders">
+                      <span>还没有收藏夹</span>
+                    </div>
+                    <div v-else>
+                      <el-dropdown-item
+                        v-for="folder in userFolders"
+                        :key="folder.folderId"
+                        :command="`collect-${folder.folderId}-${point.pointId}`"
+                        class="folder-item"
+                      >
+                        <div class="folder-info">
+                          <span class="folder-name">
+                            <i class="el-icon-folder" v-if="folder.isDefault"></i>
+                            <i class="el-icon-folder-opened" v-else></i>
+                            {{ folder.folderName }}
+                          </span>
+                          <span class="folder-count">{{ folder.collectCount }}</span>
+                        </div>
+                      </el-dropdown-item>
+                    </div>
+                    <el-divider style="margin: 8px 0;"></el-divider>
+                    <el-dropdown-item :command="`create-folder-${point.pointId}`" class="create-folder-item">
+                      <i class="el-icon-plus"></i> 新建收藏夹
+                    </el-dropdown-item>
+                  </div>
+                </el-dropdown-menu>
+              </el-dropdown>
             </div>
           </div>
 
@@ -310,8 +355,6 @@
 import { 
   getSubjectList, 
   getKnowledgePointList, 
-  getHotPoints, 
-  getLatestPoints, 
   getRecommendPoints, 
   toggleLike, 
   toggleCollect, 
@@ -353,11 +396,16 @@ export default {
       currentPage: 1,
       pageSize: 10,
       total: 0,
-      queryParams: { subjectId: null, difficulty: null, title: '' },
+      queryParams: {
+        subjectId: null,
+        difficulty: null,
+        title: '',
+        sortType: 'recommend'
+      },
       myArticleCount: 0,
       myCollectCount: 0,
       totalKnowledgeCount: 0,
-      activeTab: 'recommend',
+      activeTab: 'plaza',
       filterParams: {
         subjectId: null,
         difficulty: null,
@@ -366,11 +414,14 @@ export default {
       },
       // 收藏夹相关
       folderList: [],
+      userFolders: [],
       selectedFolderId: null,
       selectedFolderName: '',
       createFolderDialog: false,
       moveDialog: false,
       selectedKnowledge: null,
+      isCollectMode: false,
+      currentKnowledgePoint: null,
       newFolder: {
         folderName: '',
         description: '',
@@ -385,9 +436,9 @@ export default {
     }
   },
   created() {
-    // 检查URL参数中的tab，支持从编辑页面返回到指定标签页
+    // 检查URL参数中的tab
     const tab = this.$route.query.tab
-    if (tab && ['hot', 'latest', 'recommend', 'myArticles', 'myCollects'].includes(tab)) {
+    if (tab && ['plaza', 'myArticles', 'myCollects'].includes(tab)) {
       this.activeTab = tab
     }
     
@@ -405,8 +456,29 @@ export default {
       })
     },
     loadPointList() {
+      // 广场tab的查询逻辑
+      if (this.activeTab !== 'plaza') return
+      
       this.loading = true
-      const params = { pageNum: this.currentPage, pageSize: this.pageSize, ...this.queryParams }
+      
+      // 统一使用万能接口，支持所有筛选条件
+      const params = { 
+        pageNum: this.currentPage, 
+        pageSize: this.pageSize, 
+        ...this.queryParams 
+      }
+      
+      // 根据sortType添加排序参数
+      if (this.queryParams.sortType === 'hot') {
+        params.orderBy = 'view_count'  // 按浏览量排序
+      } else if (this.queryParams.sortType === 'latest') {
+        params.orderBy = 'create_time'  // 按创建时间排序
+      } else if (this.queryParams.sortType === 'recommend') {
+        // 推荐使用复杂算法，调用专门接口
+        this.loadRecommendPoints()
+        return
+      }
+      
       getKnowledgePointList(params).then(response => {
         this.pointList = response.rows || []
         this.total = response.total || 0
@@ -414,21 +486,17 @@ export default {
         this.loading = false
       })
     },
+    
     handleTabClick(tab) {
       this.currentPage = 1
       this.resetFilter()
       this.loadDataByTab()
     },
+    
     loadDataByTab() {
       switch (this.activeTab) {
-        case 'hot':
-          this.loadHotPoints()
-          break
-        case 'latest':
-          this.loadLatestPoints()
-          break
-        case 'recommend':
-          this.loadRecommendPoints()
+        case 'plaza':
+          this.loadPointList()
           break
         case 'myArticles':
           this.loadMyArticles()
@@ -437,26 +505,8 @@ export default {
           this.initCollectTab()
           break
         default:
-          this.loadRecommendPoints()
+          this.loadPointList()
       }
-    },
-    loadHotPoints() {
-      this.loading = true
-      getHotPoints(10).then(response => {
-        this.pointList = response.data || []
-        this.total = this.pointList.length
-      }).finally(() => {
-        this.loading = false
-      })
-    },
-    loadLatestPoints() {
-      this.loading = true
-      getLatestPoints(10).then(response => {
-        this.pointList = response.data || []
-        this.total = this.pointList.length
-      }).finally(() => {
-        this.loading = false
-      })
     },
     loadRecommendPoints() {
       this.loading = true
@@ -468,7 +518,14 @@ export default {
       })
     },
     viewDetail(point) {
-      this.$router.push({ name: 'knowledgeDetail', params: { pointId: point.pointId } })
+      // 大厂级性能优化：传递已有基础数据，避免重复请求
+      this.$router.push({ 
+        name: 'knowledgeDetail', 
+        params: { 
+          pointId: point.pointId,
+          baseData: point  // 传递列表中已有的基础数据
+        } 
+      })
     },
     handleLike(point) {
       toggleLike(point.pointId).then(response => {
@@ -483,18 +540,47 @@ export default {
         this.$message.error('操作失败，请先登录')
       })
     },
-    handleCollect(point) {
-      toggleCollect(point.pointId).then(response => {
-        this.$message.success(response.msg)
-        point.isCollected = response.data
-        if (response.data) {
-          point.collectCount++
-        } else {
-          point.collectCount--
+    
+    /** 处理收藏夹下拉菜单命令 */
+    handleFolderCommand(command, point) {
+      if (command.startsWith('collect-')) {
+        const parts = command.split('-')
+        const folderId = parts[1]
+        const pointId = parts[2] || point.pointId
+        this.collectToSpecificFolder(pointId, folderId, point)
+      } else if (command.startsWith('create-folder-')) {
+        const pointId = command.split('-')[2] || point.pointId
+        this.currentKnowledgePoint = point
+        this.showCreateFolderDialog()
+      }
+    },
+    
+    /** 收藏到指定收藏夹 */
+    async collectToSpecificFolder(pointId, folderId, point) {
+      try {
+        const res = await collectToFolder(pointId, folderId)
+        if (res.code === 200) {
+          this.$message.success('收藏成功')
+          if (point) {
+            point.isCollected = true
+            point.collectCount++
+          }
+          // 刷新收藏夹列表和收藏总数
+          this.loadFolders()
+          this.loadMyCollectCount()
         }
-      }).catch(() => {
-        this.$message.error('操作失败，请先登录')
-      })
+      } catch (error) {
+        console.error('收藏失败:', error)
+        this.$message.error('收藏失败，请先登录')
+      }
+    },
+    
+    /** 下拉菜单显示/隐藏时加载收藏夹 */
+    onCollectDropdownChange(visible, point) {
+      if (visible) {
+        this.currentKnowledgePoint = point
+        this.loadFolders()
+      }
     },
     loadMyCollects() {
       if (!this.currentUserId) {
@@ -513,7 +599,6 @@ export default {
         if (defaultFolder) {
           this.selectedFolderId = defaultFolder.folderId
           this.selectedFolderName = defaultFolder.folderName
-          console.log('临时选中默认收藏夹:', this.selectedFolderId)
         }
       }
       
@@ -522,44 +607,9 @@ export default {
         params.folderId = this.selectedFolderId
       }
       
-      console.log('加载收藏列表，参数:', params, '当前选中收藏夹ID:', this.selectedFolderId)
-      console.log('API调用URL:', '/api/knowledge/myCollects', '完整参数:', JSON.stringify(params))
-      
-      // 验证参数是否正确
-      if (!params.folderId) {
-        console.warn('⚠️  警告：没有folderId参数！将加载所有收藏')
-        console.warn('当前状态:', {
-          selectedFolderId: this.selectedFolderId,
-          folderListCount: this.folderList.length,
-          folderList: this.folderList
-        })
-      } else {
-        console.log('✅ 正确传递folderId参数:', params.folderId)
-      }
-      
       getMyCollects(params).then(response => {
-        console.log('收藏列表API响应:', response)
         this.pointList = response.data || []
         this.total = this.pointList.length
-        console.log('设置pointList:', this.pointList.length, '个知识点')
-        
-        // 验证后端是否正确过滤
-        console.warn('🚨 后端API问题分析：', {
-          '请求的folderId': params.folderId,
-          '返回的记录数': this.pointList.length,
-          '期望结果': 'folderId=4应该只返回pointId=6(根据收藏关系表)',
-          '实际返回': this.pointList.map(p => `pointId=${p.pointId}`),
-          '问题': '后端SQL查询缺少folderId的WHERE条件'
-        })
-        
-        // 验证数据是否正确过滤
-        if (this.selectedFolderId && this.pointList.length > 0) {
-          console.log('验证：当前选中收藏夹ID =', this.selectedFolderId)
-          console.log('返回的知识点数据:', this.pointList.map(p => ({
-            title: p.title,
-            pointId: p.pointId
-          })))
-        }
       }).catch((error) => {
         console.error('加载收藏失败:', error)
         this.$message.error('加载失败')
@@ -578,13 +628,6 @@ export default {
         if (defaultFolder) {
           this.selectedFolderId = defaultFolder.folderId
           this.selectedFolderName = defaultFolder.folderName
-          console.log('自动选中默认收藏夹:', {
-            folderId: this.selectedFolderId,
-            folderName: this.selectedFolderName,
-            defaultFolder
-          })
-        } else {
-          console.warn('未找到默认收藏夹')
         }
       }
       // 加载收藏列表
@@ -602,7 +645,7 @@ export default {
         const res = await getUserFolders()
         if (res.code === 200) {
           this.folderList = res.data || []
-          console.log('收藏夹列表:', this.folderList)
+          this.userFolders = res.data || []
         }
       } catch (error) {
         console.error('加载收藏夹失败:', error)
@@ -620,7 +663,7 @@ export default {
     },
     
     /** 创建收藏夹 */
-    async createFolder() {
+    async createFolderAction() {
       try {
         await this.$refs.folderForm.validate()
         const res = await createFolder(this.newFolder)
@@ -628,6 +671,15 @@ export default {
           this.$message.success('创建成功')
           this.createFolderDialog = false
           await this.loadFolders()
+          
+          // 如果有当前知识点，自动收藏到新建的收藏夹
+          if (this.currentKnowledgePoint && res.data && res.data.folderId) {
+            await this.collectToSpecificFolder(
+              this.currentKnowledgePoint.pointId, 
+              res.data.folderId, 
+              this.currentKnowledgePoint
+            )
+          }
         } else {
           this.$message.error(res.msg || '创建失败')
         }
@@ -644,8 +696,8 @@ export default {
       this.loadMyCollects()
     },
 
-    /** 处理收藏夹菜单命令 */
-    handleFolderCommand({ action, folder }) {
+    /** 处理收藏夹管理菜单命令 */
+    handleFolderManageCommand({ action, folder }) {
       if (action === 'edit') {
         this.editFolder(folder)
       } else if (action === 'delete') {
@@ -731,7 +783,10 @@ export default {
         if (res.code === 200) {
           this.$message.success('移动成功')
           this.moveDialog = false
+          // 重新加载收藏列表和收藏夹列表
           this.loadMyCollects()
+          this.loadFolders()
+          this.loadMyCollectCount()
         } else {
           this.$message.error(res.msg || '移动失败')
         }
@@ -751,7 +806,10 @@ export default {
           const res = await toggleCollect(point.pointId)
           if (res.code === 200) {
             this.$message.success('已移出')
+            // 重新加载收藏列表和收藏夹列表
             this.loadMyCollects()
+            this.loadFolders()
+            this.loadMyCollectCount()
           } else {
             this.$message.error(res.msg || '操作失败')
           }
@@ -901,6 +959,17 @@ export default {
 }
 .filter-bar .el-select,
 .filter-bar .el-input {
+  width: 100%;
+}
+.plaza-filters {
+  margin-bottom: 20px;
+  padding: 16px;
+  background-color: #fafafa;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+.plaza-filters .el-select,
+.plaza-filters .el-input {
   width: 100%;
 }
 .tab-nav {
@@ -1284,10 +1353,15 @@ export default {
   justify-content: center;
   opacity: 0;
   transition: opacity 0.2s;
+  cursor: pointer;
 }
 
 .knowledge-card:hover .card-menu {
   opacity: 1;
+}
+
+.card-menu:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .card-menu i {
@@ -1429,5 +1503,70 @@ export default {
   .knowledge-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* 收藏夹下拉菜单样式 */
+.collect-folder-menu {
+  padding: 10px;
+  min-width: 200px;
+}
+
+.folder-header {
+  font-size: 14px;
+  font-weight: bold;
+  color: #606266;
+  margin-bottom: 8px;
+  text-align: center;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.no-folders {
+  text-align: center;
+  color: #909399;
+  font-size: 13px;
+  padding: 10px;
+}
+
+.folder-item {
+  display: block !important;
+  padding: 8px 12px !important;
+}
+
+.folder-item:hover {
+  background-color: #f5f7fa;
+}
+
+.folder-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.folder-name {
+  font-size: 13px;
+  color: #606266;
+}
+
+.folder-name i {
+  margin-right: 5px;
+  color: #909399;
+}
+
+.folder-count {
+  font-size: 12px;
+  color: #909399;
+  background: #f0f2f5;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.create-folder-item {
+  color: #409eff !important;
+  font-size: 13px;
+}
+
+.create-folder-item:hover {
+  background-color: #ecf5ff;
 }
 </style>

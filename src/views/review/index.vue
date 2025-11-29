@@ -30,23 +30,6 @@
           </div>
         </div>
       </el-card>
-      <div v-if="weakKnowledgePoints.length > 0" class="weak-knowledge-card mb-5">
-        <h3 class="card-title">📉 薄弱知识点分析</h3>
-        <div class="weak-points-list">
-          <div v-for="(point, index) in weakKnowledgePoints.slice(0, 3)" :key="point.pointId" class="weak-point-item">
-            <div class="point-header">
-              <span class="point-rank">#{{ index + 1 }}</span>
-              <span class="point-title">{{ point.title }}</span>
-              <el-tag size="mini" :type="['success', 'warning', 'danger'][point.difficulty - 1] || 'info'">
-                难度: {{ ['简单', '中等', '困难'][point.difficulty - 1] || '未知' }}
-              </el-tag>
-            </div>
-            <el-button size="mini" type="primary" plain @click="gotoKnowledge(point.pointId)">
-              💡 去巩固 →
-            </el-button>
-          </div>
-        </div>
-      </div>
       <div class="container ">
         <div v-for="(questionType,index) in paperDto.paperQuestionTypeDto" :key="index">
           <div class="part bg-gray-100 p-4 text-black">
@@ -210,7 +193,7 @@
 
 <script>
 import wrapper from "@/components/wrapper.vue";
-import {getPaperAnswer, getWeakKnowledgePoints, getQuestionsKnowledgePoints} from "@/api/paperAnswer";
+import {getPaperAnswer, getQuestionsKnowledgePoints} from "@/api/paperAnswer";
 import {formatSeconds} from "@/utils/time";
 import ai from "@/components/ai.vue";
 import ElImageViewer from "element-ui/packages/image/src/image-viewer";
@@ -285,7 +268,6 @@ export default {
       answerOverflow: {},
       answerExpanded: {},
       answerCollapseHeight: 280,
-      weakKnowledgePoints: [],
       questionKnowledgeMap: {}
     }
   },
@@ -336,18 +318,7 @@ export default {
         this.bindQuestionImagePreview()
       })
       
-      this.loadWeakKnowledgePoints(paperAnswerId)
       this.loadQuestionKnowledgePoints()
-    },
-    async loadWeakKnowledgePoints(paperAnswerId) {
-      try {
-        const res = await getWeakKnowledgePoints(paperAnswerId)
-        if (res.code === 200 && res.data) {
-          this.weakKnowledgePoints = res.data
-        }
-      } catch (error) {
-        console.error('加载薄弱知识点失败', error)
-      }
     },
     async loadQuestionKnowledgePoints() {
       if (!this.paperDto.paperQuestionTypeDto) return
@@ -365,11 +336,6 @@ export default {
       } catch (error) {
         console.error('加载题目知识点失败', error)
       }
-    },
-    gotoKnowledge(knowledgePointId) {
-      this.$router.push({
-        path: `/knowledge/detail/${knowledgePointId}`
-      })
     },
     async loadFavoriteQuestionIds() {
       if (!this.paperAnswerId) {
@@ -1226,61 +1192,6 @@ export default {
   text-decoration: underline;
 }
 
-/* 薄弱知识点卡片 */
-.weak-knowledge-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 12px;
-  padding: 20px;
-  color: white;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.weak-knowledge-card .card-title {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 15px;
-  color: white;
-}
-
-.weak-points-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.weak-point-item {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  border-radius: 8px;
-  padding: 12px 15px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: all 0.3s ease;
-}
-
-.weak-point-item:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateX(5px);
-}
-
-.point-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-}
-
-.point-rank {
-  font-size: 20px;
-  font-weight: bold;
-  color: #ffd700;
-}
-
-.point-title {
-  font-size: 16px;
-  font-weight: 500;
-}
 
 /* 知识点标签行 */
 .knowledge-points-row {

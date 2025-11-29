@@ -23,39 +23,40 @@ export function getKnowledgePointList(params) {
 }
 
 /**
- * 查询知识点详情
+ * 查询知识点详情（已完全废弃，请勿使用）
+ * @deprecated 已删除！请使用 getKnowledgePointBase + getKnowledgePointContent 分步查询
  * @param {Number} pointId 知识点ID
  */
 export function getKnowledgePointDetail(pointId) {
+  console.error('getKnowledgePointDetail已废弃！请使用分步查询：getKnowledgePointBase + getKnowledgePointContent')
+  throw new Error('该API已废弃，请使用分步查询方案')
+}
+
+/**
+ * 获取单个知识点基础信息 - 复用列表查询
+ * @param {Number} pointId 知识点ID
+ */
+export function getKnowledgePointBase(pointId) {
+  return getKnowledgePointList({ pointId: pointId, status: 1 })
+    .then(response => {
+      if (response.rows && response.rows.length > 0) {
+        return { ...response, data: response.rows[0] }
+      }
+      throw new Error('知识点不存在')
+    })
+}
+
+/**
+ * 获取知识点内容详情（大字段内容）
+ * @param {Number} pointId 知识点ID
+ */
+export function getKnowledgePointContent(pointId) {
   return request({
-    url: `/student/knowledge/point/${pointId}`,
+    url: `/student/knowledge/point/${pointId}/content`,
     method: 'get'
   })
 }
 
-/**
- * 获取热门知识点
- * @param {Number} limit 数量限制
- */
-export function getHotPoints(limit = 10) {
-  return request({
-    url: '/student/knowledge/point/hot',
-    method: 'get',
-    params: { limit }
-  })
-}
-
-/**
- * 获取最新知识点
- * @param {Number} limit 数量限制
- */
-export function getLatestPoints(limit = 10) {
-  return request({
-    url: '/student/knowledge/point/latest',
-    method: 'get',
-    params: { limit }
-  })
-}
 
 /**
  * 获取推荐知识点
