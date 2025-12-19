@@ -207,7 +207,7 @@ export default {
 
       this.chatRecord.push(
         // 用户消息
-        { role: `${this.$store.state.user.name}:`, content: this.content },
+        { role: `${this.$store.getters.nickName || this.$store.getters.userName || '用户'}:`, content: this.content },
         // AI响应占位
         { role: "Zww:", content: "让我想想🧐，稍等一下. . . . . ." },
       );

@@ -400,7 +400,7 @@ export default {
         subjectId: null,
         difficulty: null,
         title: '',
-        sortType: 'recommend'
+        sortType: 'latest'
       },
       myArticleCount: 0,
       myCollectCount: 0,
@@ -523,7 +523,8 @@ export default {
         name: 'knowledgeDetail', 
         params: { 
           pointId: point.pointId,
-          baseData: point  // 传递列表中已有的基础数据
+          baseData: point,  // 传递列表中已有的基础数据
+          fromTab: this.activeTab  // 传递来源tab
         } 
       })
     },

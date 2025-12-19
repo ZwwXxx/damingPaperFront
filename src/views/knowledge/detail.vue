@@ -306,6 +306,14 @@
       </el-row>
     </el-card>
 
+    <!-- 图片预览 -->
+    <el-image-viewer
+      v-if="imagePreview.visible"
+      :url-list="imagePreview.urls"
+      :initial-index="imagePreview.index"
+      :on-close="closeImagePreview"
+    />
+
     <!-- 回复对话框 -->
     <el-dialog
       title="回复评论"
@@ -347,6 +355,7 @@ import {
 } from '@/api/knowledge'
 import { marked } from 'marked'
 import { mapGetters } from 'vuex'
+import ElImageViewer from 'element-ui/packages/image/src/image-viewer'
 
 export default {
   name: 'KnowledgeDetail',
@@ -401,7 +410,15 @@ export default {
         folderName: '',
         description: '',
         isPublic: 0
-      }
+      },
+      // 图片预览相关数据
+      imagePreview: {
+        visible: false,
+        urls: [],
+        index: 0
+      },
+      // 记录滚动位置
+      scrollTop: undefined
     }
   },
   created() {
@@ -419,11 +436,9 @@ export default {
     this.scrollHandler = this.debounce(this.handleScroll, 0)
     window.addEventListener('scroll', this.scrollHandler)
     window.addEventListener('resize', this.resizeCate)
-  },
-  beforeDestroy() {
-    // 清理事件监听
-    window.removeEventListener('scroll', this.scrollHandler)
-    window.removeEventListener('resize', this.resizeCate)
+    
+    // 初始化图片预览功能
+    this.initImagePreview()
   },
   methods: {
     /** 加载详情 - 优化的分步查询方案 */
@@ -462,9 +477,11 @@ export default {
         this.$router.back()
       } finally {
         this.loading = false
-        // 等待 DOM 渲染后生成目录
+        // 等待 DOM 渲染后生成目录和绑定图片事件
         this.$nextTick(() => {
           this.getTitles()
+          // 内容渲染完成后重新绑定图片预览事件
+          this.bindImageClickEvents()
         })
         // 加载评论
         this.loadComments()
@@ -591,7 +608,11 @@ export default {
     },
     /** 返回 */
     goBack() {
-      this.$router.push('/knowledge')
+      const fromTab = this.$route.params.fromTab
+      this.$router.push({
+        path: '/knowledge',
+        query: fromTab ? { tab: fromTab } : {}
+      })
     },
     /** 获取难度名称 */
     getDifficultyName(difficulty) {
@@ -624,7 +645,16 @@ export default {
     formatContent(content) {
       if (!content) return ''
       try {
-        return marked(content)
+        let html = marked(content)
+        // 处理图片标签，添加预览功能
+        html = html.replace(/<img\s+([^>]*?)src\s*=\s*["']([^"']+)["']([^>]*?)>/gi, (match, beforeSrc, src, afterSrc) => {
+          // 提取alt属性
+          const altMatch = match.match(/alt\s*=\s*["']([^"']*?)["']/i)
+          const alt = altMatch ? altMatch[1] : ''
+          
+          return `<img src="${src}" alt="${alt}" class="content-image" data-preview="${src}" style="max-width: 100%; cursor: pointer; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); margin: 16px 0; display: block; transition: all 0.3s ease;" />`
+        })
+        return html
       } catch (error) {
         console.error('Markdown渲染失败:', error)
         return content.replace(/\n/g, '<br>')
@@ -1104,7 +1134,101 @@ export default {
       if (days < 7) return `${days}天前`
       
       return postTime.toLocaleString()
+    },
+    
+    /** 初始化图片预览功能 */
+    initImagePreview() {
+      this.$nextTick(() => {
+        this.bindImageClickEvents()
+      })
+    },
+    
+    /** 绑定图片点击事件 */
+    bindImageClickEvents() {
+      // 移除之前的事件监听
+      document.removeEventListener('click', this.handleImageClick)
+      // 添加新的事件监听
+      document.addEventListener('click', this.handleImageClick)
+    },
+    
+    /** 处理图片点击事件 */
+    handleImageClick(event) {
+      const target = event.target
+      if (target.tagName === 'IMG' && target.hasAttribute('data-preview')) {
+        event.preventDefault()
+        event.stopPropagation()
+        
+        // 获取所有可预览的图片
+        const allImages = Array.from(document.querySelectorAll('img[data-preview]'))
+        const urls = allImages.map(img => img.getAttribute('data-preview'))
+        const currentIndex = allImages.indexOf(target)
+        
+        this.showImagePreview(urls, currentIndex)
+      }
+    },
+    
+    /** 显示图片预览 */
+    showImagePreview(urls, index = 0) {
+      this.imagePreview = {
+        visible: true,
+        urls: urls,
+        index: index
+      }
+      // 阻止背景页面滚动
+      this.preventBodyScroll()
+    },
+    
+    /** 关闭图片预览 */
+    closeImagePreview() {
+      this.imagePreview.visible = false
+      // 恢复背景页面滚动
+      this.restoreBodyScroll()
+    },
+    
+    /** 阻止body滚动 */
+    preventBodyScroll() {
+      // 记录当前滚动位置
+      this.scrollTop = document.documentElement.scrollTop || document.body.scrollTop
+      // 设置body样式阻止滚动
+      document.body.style.cssText += `
+        position: fixed;
+        top: -${this.scrollTop}px;
+        width: 100%;
+        height: 100vh;
+        overflow: hidden;
+      `
+    },
+    
+    /** 恢复body滚动 */
+    restoreBodyScroll() {
+      // 恢复body样式
+      document.body.style.cssText = document.body.style.cssText
+        .replace(/position:\s*fixed;?/gi, '')
+        .replace(/top:\s*-?\d+px;?/gi, '')
+        .replace(/width:\s*100%;?/gi, '')
+        .replace(/height:\s*100vh;?/gi, '')
+        .replace(/overflow:\s*hidden;?/gi, '')
+      
+      // 恢复滚动位置
+      if (this.scrollTop !== undefined) {
+        window.scrollTo(0, this.scrollTop)
+        this.scrollTop = undefined
+      }
     }
+  },
+  
+  beforeDestroy() {
+    // 清理滚动事件监听
+    window.removeEventListener('scroll', this.scrollHandler)
+    window.removeEventListener('resize', this.resizeCate)
+    // 清理图片点击事件监听
+    document.removeEventListener('click', this.handleImageClick)
+    // 确保恢复页面滚动
+    this.restoreBodyScroll()
+  },
+  
+  components: {
+    ElImageViewer
   }
 }
 </script>
@@ -2005,5 +2129,36 @@ export default {
 
 .create-folder-item:hover {
   background-color: #ecf5ff !important;
+}
+
+/* 图片预览样式 */
+.content-box >>> .content-image {
+  max-width: 100%;
+  cursor: pointer;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  margin: 16px 0;
+  display: block;
+  transition: all 0.3s ease;
+}
+
+.content-box >>> .content-image:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* 图片加载状态 */
+.content-box >>> .content-image[src=""] {
+  background: #f5f7fa;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.content-box >>> .content-image[src=""]:after {
+  content: "加载中...";
+  color: #909399;
+  font-size: 14px;
 }
 </style>

@@ -116,10 +116,10 @@
                   </el-tag>
                 </template>
                 <template v-else>
-                  <el-tag type="success" size="mini"
+                <el-tag type="success" size="mini"
                           v-if="answerMap[question.itemOrder] && answerMap[question.itemOrder].correct">正确
-                  </el-tag>
-                  <el-tag type="danger" size="mini" v-else>错误</el-tag>
+                </el-tag>
+                <el-tag type="danger" size="mini" v-else>错误</el-tag>
                 </template>
               </div>
               <div class="answer-row" v-if="question.questionType===3">
@@ -427,7 +427,7 @@ export default {
       imgArray.forEach((img, index) => {
         const url = signedUrls[index]
         if (url) {
-          img.style.cursor = 'zoom-in'
+        img.style.cursor = 'zoom-in'
           const previewIndex = previewUrls.push(url) - 1
           img.onclick = () => this.openImagePreview(previewUrls, previewIndex)
         } else {
