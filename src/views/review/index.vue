@@ -39,7 +39,7 @@
             <div class="q-title" :id="question.itemOrder">
               <p>
                 <span>{{ question.itemOrder + 1 }}. </span>
-                <span class="question-title-content" v-html="sanitizeHtml(question.questionTitle)"></span>
+                <span class="question-title-content" :class="{'markdown-body': question.questionTitleFormat === 'markdown'}" v-html="renderContent(question.questionTitle, question.questionTitleFormat)"></span>
                 <span>( {{ question.score }}分 )</span>
               </p>
             </div>
@@ -55,7 +55,7 @@
                     v-for="(selection,index) in question.items" :key="index">
                   <span class="option-content">
                     <span class="option-prefix">{{ selection.prefix }}.</span>
-                    <span class="option-text" v-html="sanitizeHtml(selection.content)"></span>
+                    <span class="option-text" :class="{'markdown-body': question.optionFormat === 'markdown'}" v-html="renderContent(selection.content, question.optionFormat)"></span>
                   </span>
                 </el-radio>
               </el-radio-group>
@@ -64,7 +64,7 @@
                 <el-checkbox disabled v-for="(checkBox,index) in question.items" :label="checkBox.prefix" :key="index">
                   <span class="option-content">
                     <span class="option-prefix">{{ checkBox.prefix }}.</span>
-                    <span class="option-text" v-html="sanitizeHtml(checkBox.content)"></span>
+                    <span class="option-text" :class="{'markdown-body': question.optionFormat === 'markdown'}" v-html="renderContent(checkBox.content, question.optionFormat)"></span>
                   </span>
                 </el-checkbox>
               </el-checkbox-group>
@@ -99,7 +99,20 @@
                   </div>
                   <span class="value empty-answer" v-else>未作答</span>
                 </template>
-                <span class="value" v-else-if="question.questionType===1 || question.questionType===4 || question.questionType===5">{{
+                <template v-else-if="question.questionType===5">
+                  <!-- 填空题：优先使用contentArray，如果没有则尝试从content解析 -->
+                  <template v-if="answerMap[question.itemOrder]">
+                    <span class="value" v-if="answerMap[question.itemOrder].contentArray && answerMap[question.itemOrder].contentArray.length > 0">{{
+                      answerMap[question.itemOrder].contentArray.join(', ')
+                    }}</span>
+                    <span class="value" v-else-if="answerMap[question.itemOrder].content && answerMap[question.itemOrder].content !== '未填' && answerMap[question.itemOrder].content.trim() !== ''">{{
+                      answerMap[question.itemOrder].content
+                    }}</span>
+                    <span class="value empty-answer" v-else>未作答</span>
+                  </template>
+                  <span class="value empty-answer" v-else>未作答</span>
+                </template>
+                <span class="value" v-else-if="question.questionType===1 || question.questionType===4">{{
                     answerMap[question.itemOrder] ? answerMap[question.itemOrder].content : ''
                   }}</span>
                 <span class="value" v-else>{{
@@ -168,8 +181,9 @@
                   </div>
                   <div
                       class="analysis-content"
+                      :class="{'markdown-body': question.analysisFormat === 'markdown'}"
                       v-if="question.analysis"
-                      v-html="question.analysis"
+                      v-html="renderAnalysis(question)"
                       :ref="'analysis-' + question.itemOrder"></div>
                   <div class="analysis-empty" v-else>暂无解析</div>
                 </div>
@@ -200,6 +214,7 @@ import ElImageViewer from "element-ui/packages/image/src/image-viewer";
 import {addFavorite, getFavoriteList, removeFavorite} from "@/api/questionFavorite";
 import { getOssSign } from "@/api/common";
 import DOMPurify from 'dompurify';
+import { marked } from 'marked';
 
 export default {
   name: "index",
@@ -299,10 +314,67 @@ export default {
       }
       // 使用DOMPurify清理HTML
       return DOMPurify.sanitize(html, {
-        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre'],
+        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
         ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target'],
         ALLOW_DATA_ATTR: false
       });
+    },
+    /**
+     * 根据格式渲染内容（题干或解析）
+     * @param {string} content - 内容
+     * @param {string} format - 格式（html或markdown）
+     * @returns {string} - 渲染后的HTML
+     */
+    renderContent(content, format) {
+      if (!content) return '';
+      
+      const contentFormat = format || 'html';
+      
+      if (contentFormat === 'markdown') {
+        try {
+          // 使用 marked 渲染 Markdown
+          let html = marked(content);
+          // 处理表格，添加边框样式
+          html = html.replace(/<table([^>]*)>/gi, (match, attrs) => {
+            return `<table${attrs} style="border-collapse: collapse; width: 100%; margin: 10px 0; border: 1px solid #dcdfe6;">`;
+          });
+          // 为表格单元格添加边框
+          html = html.replace(/<th([^>]*)>/gi, (match, attrs) => {
+            return `<th${attrs} style="border: 1px solid #dcdfe6; padding: 8px 12px; text-align: left; background-color: #f5f7fa; font-weight: 600;">`;
+          });
+          html = html.replace(/<td([^>]*)>/gi, (match, attrs) => {
+            return `<td${attrs} style="border: 1px solid #dcdfe6; padding: 8px 12px; text-align: left;">`;
+          });
+          // 处理图片标签，添加预览功能
+          html = html.replace(/<img\s+([^>]*?)src\s*=\s*["']([^"']+)["']([^>]*?)>/gi, (match, beforeSrc, src, afterSrc) => {
+            const altMatch = match.match(/alt\s*=\s*["']([^"']*?)["']/i);
+            const alt = altMatch ? altMatch[1] : '';
+            return `<img src="${src}" alt="${alt}" class="content-image" data-preview="${src}" style="max-width: 100%; cursor: pointer; border-radius: 8px; margin: 16px 0; display: block;" />`;
+          });
+          // 使用 DOMPurify 清理渲染后的 HTML
+          return DOMPurify.sanitize(html, {
+            ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+            ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target', 'data-preview'],
+            ALLOW_DATA_ATTR: false
+          });
+        } catch (error) {
+          console.error('Markdown渲染失败:', error);
+          // 渲染失败时返回原始内容（转义HTML）
+          return this.sanitizeHtml(content.replace(/\n/g, '<br>'));
+        }
+      } else {
+        // HTML 格式，直接使用 sanitizeHtml
+        return this.sanitizeHtml(content);
+      }
+    },
+    /**
+     * 根据格式渲染解析内容
+     * @param {Object} question - 题目对象
+     * @returns {string} - 渲染后的HTML
+     */
+    renderAnalysis(question) {
+      if (!question.analysis) return '';
+      return this.renderContent(question.analysis, question.analysisFormat);
     },
     async getPaperAnswerItem(paperAnswerId) {
       const res = await getPaperAnswer(paperAnswerId)
@@ -1147,6 +1219,118 @@ export default {
 }
 ::v-deep .analysis-content p {
   margin: 4px 0;
+}
+
+/* Markdown 样式支持 */
+.analysis-content.markdown-body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #24292e;
+}
+
+.analysis-content.markdown-body h1,
+.analysis-content.markdown-body h2,
+.analysis-content.markdown-body h3,
+.analysis-content.markdown-body h4,
+.analysis-content.markdown-body h5,
+.analysis-content.markdown-body h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.analysis-content.markdown-body h1 {
+  font-size: 2em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: 0.3em;
+}
+
+.analysis-content.markdown-body h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: 0.3em;
+}
+
+.analysis-content.markdown-body code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  background-color: rgba(27, 31, 35, 0.05);
+  border-radius: 3px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.analysis-content.markdown-body pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: #f6f8fa;
+  border-radius: 6px;
+}
+
+.analysis-content.markdown-body pre code {
+  display: inline;
+  max-width: auto;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  line-height: inherit;
+  word-wrap: normal;
+  background-color: transparent;
+  border: 0;
+}
+
+.analysis-content.markdown-body blockquote {
+  padding: 0 1em;
+  color: #6a737d;
+  border-left: 0.25em solid #dfe2e5;
+  margin: 0;
+}
+
+.analysis-content.markdown-body table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow: auto;
+}
+
+.analysis-content.markdown-body table th,
+.analysis-content.markdown-body table td {
+  padding: 6px 13px;
+  border: 1px solid #dcdfe6;
+}
+
+.analysis-content.markdown-body table th {
+  font-weight: 600;
+  background-color: #f5f7fa;
+}
+
+/* 使用深度选择器确保样式应用到 v-html 注入的内容 */
+.analysis-content >>> table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow: auto;
+  margin: 10px 0;
+  border: 1px solid #dcdfe6;
+}
+
+.analysis-content >>> table th,
+.analysis-content >>> table td {
+  padding: 6px 13px;
+  border: 1px solid #dcdfe6;
+}
+
+.analysis-content >>> table th {
+  font-weight: 600;
+  background-color: #f5f7fa;
 }
 
 /* 富文本题干样式 */

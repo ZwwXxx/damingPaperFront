@@ -385,6 +385,9 @@ export default {
         const infoRes = await this.$store.dispatch('GetInfo')
         console.log('[Login] 获取用户信息结果:', infoRes)
         
+        // 设置登录动画标记，用于在首页显示3秒动画
+        sessionStorage.setItem('showLoginAnimation', 'true')
+        
         this.$router.push({path:'/'})
       } else {
         this.$message.error(res.msg || "登录失败")
@@ -621,6 +624,9 @@ export default {
         
         if (res.code === 200) {
           console.log('✅ 用户信息获取成功:', res.user)
+          
+          // 设置登录动画标记，用于在首页显示3秒动画
+          sessionStorage.setItem('showLoginAnimation', 'true')
           
           // 延迟跳转
           setTimeout(() => {

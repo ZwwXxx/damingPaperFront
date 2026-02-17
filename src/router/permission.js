@@ -54,9 +54,21 @@ router.beforeEach(async (to, from, next) => {
 })
 
 // 路由后置守卫
-router.afterEach((to) => {
+router.afterEach((to, from) => {
   // 设置页面标题
   document.title = to.meta.title || '刷题系统'
+  
+  // 从登录页跳转出来时，触发公告检查事件
+  if (from && from.path === '/login' && to.path !== '/login') {
+    const token = store.getters.token || localStorage.getItem('token')
+    if (token) {
+      console.log('[路由守卫] 登录成功，准备触发公告检查')
+      // 使用事件总线通知layout组件检查公告
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('check-notice', { detail: { from: 'login' } }))
+      }, 1000)
+    }
+  }
 })
 
 export default router

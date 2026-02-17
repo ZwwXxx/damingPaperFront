@@ -248,7 +248,7 @@ export default {
         name: 'paper',
         params: {paperId: String(paperId)}
       });
-    }
+    },
   },
   created() {
     this.fetchSubjects();
@@ -256,6 +256,5 @@ export default {
   }
 };
 </script>
-<style>
-
+<style scoped>
 </style>

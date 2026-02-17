@@ -47,11 +47,21 @@
         <div class="flex justify-between items-center border-b pb-2 mb-3">
           <div>
             <p class="font-semibold text-lg text-gray-800">
-              <span class="question-title-content" v-html="sanitizeHtml(item.questionTitle || '题目')"></span>
+              <span class="question-title-content" :class="{'markdown-body': item.questionTitleFormat === 'markdown'}" v-html="renderContent(item.questionTitle || '题目', item.questionTitleFormat)"></span>
             </p>
             <p class="text-xs text-gray-500 mt-1">
               试卷：{{ item.paperName || '-' }} ｜ 科目：{{ transferSubject(item.subjectId) }} ｜ 上次作答：{{ item.createTime || '-' }}
             </p>
+            <div class="mt-2" v-if="item.knowledgePoints && item.knowledgePoints.length">
+              <span class="text-xs text-gray-500 mr-2">关联知识点：</span>
+              <el-tag
+                v-for="kp in item.knowledgePoints"
+                :key="kp.pointId"
+                size="mini"
+                class="mr-2 mb-1 cursor-pointer"
+                @click="gotoKnowledge(kp.pointId)"
+              >{{ kp.title }}</el-tag>
+            </div>
             <p class="error-count" v-if="item.wrongCount > 1">
               <span class="label">累计错题次数</span>
               <span class="value">{{ item.wrongCount }}</span>
@@ -113,6 +123,7 @@ import {getWrongQuestionList} from "@/api/questionAnswer";
 import {optionSubject} from "@/api/subject";
 import ElImageViewer from "element-ui/packages/image/src/image-viewer";
 import DOMPurify from 'dompurify';
+import { marked } from 'marked';
 
 export default {
   name: "wrongRecord",
@@ -146,6 +157,10 @@ export default {
     this.getWrongList()
   },
   methods: {
+    gotoKnowledge(pointId) {
+      if (!pointId) return
+      this.$router.push({ name: 'knowledgeDetail', params: { pointId: String(pointId) } })
+    },
     /**
      * 使用DOMPurify清理HTML内容，防止XSS攻击
      */
@@ -159,6 +174,41 @@ export default {
         ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target'],
         ALLOW_DATA_ATTR: false
       });
+    },
+    /**
+     * 根据格式渲染内容（题干）
+     * @param {string} content - 内容
+     * @param {string} format - 格式（html或markdown）
+     * @returns {string} - 渲染后的HTML
+     */
+    renderContent(content, format) {
+      if (!content) return '';
+      
+      const contentFormat = format || 'html';
+      
+      if (contentFormat === 'markdown') {
+        try {
+          // 使用 marked 渲染 Markdown
+          let html = marked(content);
+          // 处理图片标签
+          html = html.replace(/<img\s+([^>]*?)src\s*=\s*["']([^"']+)["']([^>]*?)>/gi, (match, beforeSrc, src, afterSrc) => {
+            const altMatch = match.match(/alt\s*=\s*["']([^"']*?)["']/i);
+            const alt = altMatch ? altMatch[1] : '';
+            return `<img src="${src}" alt="${alt}" style="max-width: 200px; max-height: 200px; cursor: pointer; border-radius: 4px;" />`;
+          });
+          // 使用 DOMPurify 清理渲染后的 HTML
+          return DOMPurify.sanitize(html, {
+            ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+            ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target'],
+            ALLOW_DATA_ATTR: false
+          });
+        } catch (error) {
+          console.error('Markdown渲染失败:', error);
+          return this.sanitizeHtml(content.replace(/\n/g, '<br>'));
+        }
+      } else {
+        return this.sanitizeHtml(content);
+      }
     },
     async loadSubjects() {
       const res = await optionSubject()

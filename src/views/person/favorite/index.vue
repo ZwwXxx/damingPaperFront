@@ -40,7 +40,7 @@
         <div class="flex justify-between items-center border-b pb-2 mb-3">
           <div>
             <p class="font-semibold text-lg text-gray-800">
-              <span class="question-title-content" v-html="sanitizeHtml(item.questionTitle || '题目')"></span>
+              <span class="question-title-content" :class="{'markdown-body': item.questionTitleFormat === 'markdown'}" v-html="renderContent(item.questionTitle || '题目', item.questionTitleFormat)"></span>
             </p>
             <p class="text-xs text-gray-500 mt-1">
               试卷：{{ item.paperName || '-' }} ｜ 科目：{{ transferSubject(item.subjectId) }} ｜ 收藏时间：{{ item.createTime || '-' }}
@@ -85,6 +85,7 @@
 import {getFavoriteDetailList, removeFavorite} from "@/api/questionFavorite";
 import {optionSubject} from "@/api/subject";
 import DOMPurify from 'dompurify';
+import { marked } from 'marked';
 
 export default {
   name: "favoriteRecord",
@@ -120,6 +121,41 @@ export default {
         ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target'],
         ALLOW_DATA_ATTR: false
       });
+    },
+    /**
+     * 根据格式渲染内容（题干）
+     * @param {string} content - 内容
+     * @param {string} format - 格式（html或markdown）
+     * @returns {string} - 渲染后的HTML
+     */
+    renderContent(content, format) {
+      if (!content) return '';
+      
+      const contentFormat = format || 'html';
+      
+      if (contentFormat === 'markdown') {
+        try {
+          // 使用 marked 渲染 Markdown
+          let html = marked(content);
+          // 处理图片标签
+          html = html.replace(/<img\s+([^>]*?)src\s*=\s*["']([^"']+)["']([^>]*?)>/gi, (match, beforeSrc, src, afterSrc) => {
+            const altMatch = match.match(/alt\s*=\s*["']([^"']*?)["']/i);
+            const alt = altMatch ? altMatch[1] : '';
+            return `<img src="${src}" alt="${alt}" style="max-width: 200px; max-height: 200px; cursor: pointer; border-radius: 4px;" />`;
+          });
+          // 使用 DOMPurify 清理渲染后的 HTML
+          return DOMPurify.sanitize(html, {
+            ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+            ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target'],
+            ALLOW_DATA_ATTR: false
+          });
+        } catch (error) {
+          console.error('Markdown渲染失败:', error);
+          return this.sanitizeHtml(content.replace(/\n/g, '<br>'));
+        }
+      } else {
+        return this.sanitizeHtml(content);
+      }
     },
     async loadSubjects() {
       const res = await optionSubject()

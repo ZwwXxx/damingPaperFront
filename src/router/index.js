@@ -114,6 +114,11 @@ const routes = [
                 path: '/knowledge/publish',
                 name: 'knowledgePublish',
                 component: () => import('@/views/knowledge/publish.vue'),
+            },
+            {
+                path: '/contact',
+                name: 'contact',
+                component: () => import('@/views/contact/index.vue'),
             }
 
         ],

@@ -53,7 +53,7 @@
                   <span class="text-red-800 font-bold mr-2" :id="questionItem.itemOrder">{{ 
                       getQuestionDisplayNumber(questionItem)
                     }}.</span>
-                  <span class="question-title-content" v-html="sanitizeHtml(questionItem.questionTitle)"></span>
+                  <span class="question-title-content" :class="{'markdown-body': questionItem.questionTitleFormat === 'markdown'}" v-html="renderContent(questionItem.questionTitle, questionItem.questionTitleFormat)"></span>
                 </span>
                 <span class="font-bold text-red-600">
                     ({{
@@ -76,7 +76,7 @@
                         v-for="(selection,index) in questionItem.items" :key="index">
                 <span class="option-content">
                   <span class="option-prefix">{{ selection.prefix }}.</span>
-                  <span class="option-text" v-html="sanitizeHtml(selection.content)"></span>
+                  <span class="option-text" :class="{'markdown-body': questionItem.optionFormat === 'markdown'}" v-html="renderContent(selection.content, questionItem.optionFormat)"></span>
                 </span>
               </el-radio>
             </el-radio-group>
@@ -87,7 +87,7 @@
               <el-checkbox v-for="(checkBox,index) in questionItem.items" :label="checkBox.prefix" :key="index">
                 <span class="option-content">
                   <span class="option-prefix">{{ checkBox.prefix }}.</span>
-                  <span class="option-text" v-html="sanitizeHtml(checkBox.content)"></span>
+                  <span class="option-text" :class="{'markdown-body': questionItem.optionFormat === 'markdown'}" v-html="renderContent(checkBox.content, questionItem.optionFormat)"></span>
                 </span>
               </el-checkbox>
             </el-checkbox-group>
@@ -100,7 +100,7 @@
                         v-for="(selection,index) in questionItem.items" :key="index">
                 <span class="option-content">
                   <span class="option-prefix">{{ selection.prefix }}.</span>
-                  <span class="option-text" v-html="sanitizeHtml(selection.content)"></span>
+                  <span class="option-text" :class="{'markdown-body': questionItem.optionFormat === 'markdown'}" v-html="renderContent(selection.content, questionItem.optionFormat)"></span>
                 </span>
               </el-radio>
             </el-radio-group>
@@ -112,14 +112,41 @@
                 v-model="answerMap[questionItem.itemOrder].content"
                 @on-change="handleTextChange(questionItem.itemOrder, $event)"
             />
-            <el-input
-                v-if="questionItem.questionType===5"
-                v-model="answerMap[questionItem.itemOrder].content"
-                type="textarea"
-                :rows="3"
-                placeholder="请输入填空题答案"
-                @input="updateCompletedStatus(questionItem.itemOrder)"
-            />
+            <!-- 填空题：根据标准答案数量显示多个输入框 -->
+            <div v-if="questionItem.questionType===5" class="fill-blank-answers">
+              <!-- 答案顺序提示 -->
+              <div 
+                v-if="questionItem.requireOrder !== undefined" 
+                style="margin-bottom: 10px; padding: 8px 12px; border-radius: 4px;"
+                :style="questionItem.requireOrder ? 'background-color: #fff7e6; border: 1px solid #ffd591;' : 'background-color: #f0f9ff; border: 1px solid #91d5ff;'"
+              >
+                <i 
+                  :class="questionItem.requireOrder ? 'el-icon-warning' : 'el-icon-info'" 
+                  :style="questionItem.requireOrder ? 'color: #fa8c16;' : 'color: #1890ff;'"
+                ></i>
+                <span 
+                  style="margin-left: 5px; font-size: 13px;"
+                  :style="questionItem.requireOrder ? 'color: #fa8c16;' : 'color: #1890ff;'"
+                >
+                  {{ questionItem.requireOrder ? '⚠️ 注意：答案必须按照标准答案的顺序填写' : '💡 提示：答案可以不按顺序填写，系统会自动匹配' }}
+                </span>
+              </div>
+              <div 
+                v-for="(answerItem, index) in getFillBlankAnswerList(questionItem)" 
+                :key="index"
+                class="fill-blank-item"
+                style="margin-bottom: 15px;"
+              >
+                <div style="font-weight: bold; margin-bottom: 5px; color: #606266;">
+                  第{{ index + 1 }}空：
+                </div>
+                <el-input
+                  :value="answerMap[questionItem.itemOrder].contentArray[index] || ''"
+                  :placeholder="`请输入第${index + 1}空答案`"
+                  @input="updateFillBlankAnswer(questionItem.itemOrder, index, $event)"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -136,7 +163,7 @@
                   <span class="text-red-800 font-bold mr-2" :id="currentQuestion.itemOrder">{{ 
                       getQuestionDisplayNumber(currentQuestion)
                     }}.</span>
-                  <span class="question-title-content" v-html="sanitizeHtml(currentQuestion.questionTitle)"></span>
+                  <span class="question-title-content" :class="{'markdown-body': currentQuestion.questionTitleFormat === 'markdown'}" v-html="renderContent(currentQuestion.questionTitle, currentQuestion.questionTitleFormat)"></span>
                 </span>
                 <span class="font-bold text-red-600">
                     ({{
@@ -191,14 +218,41 @@
                 v-model="answerMap[currentQuestion.itemOrder].content"
                 @on-change="handleTextChange(currentQuestion.itemOrder, $event)"
             />
-            <el-input
-                v-if="currentQuestion.questionType===5"
-                v-model="answerMap[currentQuestion.itemOrder].content"
-                type="textarea"
-                :rows="3"
-                placeholder="请输入填空题答案"
-                @input="updateCompletedStatus(currentQuestion.itemOrder)"
-            />
+            <!-- 填空题：根据标准答案数量显示多个输入框 -->
+            <div v-if="currentQuestion.questionType===5" class="fill-blank-answers">
+              <!-- 答案顺序提示 -->
+              <div 
+                v-if="currentQuestion.requireOrder !== undefined" 
+                style="margin-bottom: 10px; padding: 8px 12px; border-radius: 4px;"
+                :style="currentQuestion.requireOrder ? 'background-color: #fff7e6; border: 1px solid #ffd591;' : 'background-color: #f0f9ff; border: 1px solid #91d5ff;'"
+              >
+                <i 
+                  :class="currentQuestion.requireOrder ? 'el-icon-warning' : 'el-icon-info'" 
+                  :style="currentQuestion.requireOrder ? 'color: #fa8c16;' : 'color: #1890ff;'"
+                ></i>
+                <span 
+                  style="margin-left: 5px; font-size: 13px;"
+                  :style="currentQuestion.requireOrder ? 'color: #fa8c16;' : 'color: #1890ff;'"
+                >
+                  {{ currentQuestion.requireOrder ? '⚠️ 注意：答案必须按照标准答案的顺序填写' : '💡 提示：答案可以不按顺序填写，系统会自动匹配' }}
+                </span>
+              </div>
+              <div 
+                v-for="(answerItem, index) in getFillBlankAnswerList(currentQuestion)" 
+                :key="index"
+                class="fill-blank-item"
+                style="margin-bottom: 15px;"
+              >
+                <div style="font-weight: bold; margin-bottom: 5px; color: #606266;">
+                  第{{ index + 1 }}空：
+                </div>
+                <el-input
+                  :value="answerMap[currentQuestion.itemOrder].contentArray[index] || ''"
+                  :placeholder="`请输入第${index + 1}空答案`"
+                  @input="updateFillBlankAnswer(currentQuestion.itemOrder, index, $event)"
+                />
+              </div>
+            </div>
           </div>
         </div>
         <div class="question-navigation flex justify-between items-center p-4">
@@ -260,6 +314,7 @@
   import {getOrCreateShuffledOrder, clearShuffledOrder} from "@/utils/shuffle";
   import DOMPurify from 'dompurify';
   import ElImageViewer from "element-ui/packages/image/src/image-viewer";
+  import { marked } from 'marked';
 
 export default {
   name: "index",
@@ -364,7 +419,8 @@ export default {
           if (!answer) return;
           let shouldBeCompleted = false;
           if (Array.isArray(answer.contentArray) && answer.contentArray.length > 0) {
-            shouldBeCompleted = true;
+            // 填空题：检查数组中的答案是否都有值
+            shouldBeCompleted = answer.contentArray.every(a => a && a.toString().trim());
           } else if (answer.content) {
             const contentStr = answer.content.toString().trim();
             shouldBeCompleted = contentStr.length > 0;
@@ -415,10 +471,58 @@ export default {
       }
       // 使用DOMPurify清理HTML
       return DOMPurify.sanitize(html, {
-        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre'],
+        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
         ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target'],
         ALLOW_DATA_ATTR: false
       });
+    },
+    /**
+     * 根据格式渲染内容（题干或解析）
+     * @param {string} content - 内容
+     * @param {string} format - 格式（html或markdown）
+     * @returns {string} - 渲染后的HTML
+     */
+    renderContent(content, format) {
+      if (!content) return '';
+      
+      const contentFormat = format || 'html';
+      
+      if (contentFormat === 'markdown') {
+        try {
+          // 使用 marked 渲染 Markdown
+          let html = marked(content);
+          // 处理表格，添加边框样式
+          html = html.replace(/<table([^>]*)>/gi, (match, attrs) => {
+            return `<table${attrs} style="border-collapse: collapse; width: 100%; margin: 10px 0; border: 1px solid #dcdfe6;">`;
+          });
+          // 为表格单元格添加边框
+          html = html.replace(/<th([^>]*)>/gi, (match, attrs) => {
+            return `<th${attrs} style="border: 1px solid #dcdfe6; padding: 8px 12px; text-align: left; background-color: #f5f7fa; font-weight: 600;">`;
+          });
+          html = html.replace(/<td([^>]*)>/gi, (match, attrs) => {
+            return `<td${attrs} style="border: 1px solid #dcdfe6; padding: 8px 12px; text-align: left;">`;
+          });
+          // 处理图片标签，添加预览功能
+          html = html.replace(/<img\s+([^>]*?)src\s*=\s*["']([^"']+)["']([^>]*?)>/gi, (match, beforeSrc, src, afterSrc) => {
+            const altMatch = match.match(/alt\s*=\s*["']([^"']*?)["']/i);
+            const alt = altMatch ? altMatch[1] : '';
+            return `<img src="${src}" alt="${alt}" class="content-image" data-preview="${src}" style="max-width: 100%; cursor: pointer; border-radius: 8px; margin: 16px 0; display: block;" />`;
+          });
+          // 使用 DOMPurify 清理渲染后的 HTML
+          return DOMPurify.sanitize(html, {
+            ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+            ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target', 'data-preview'],
+            ALLOW_DATA_ATTR: false
+          });
+        } catch (error) {
+          console.error('Markdown渲染失败:', error);
+          // 渲染失败时返回原始内容（转义HTML）
+          return this.sanitizeHtml(content.replace(/\n/g, '<br>'));
+        }
+      } else {
+        // HTML 格式，直接使用 sanitizeHtml
+        return this.sanitizeHtml(content);
+      }
     },
     getQuestionTypeName(questType) {
       const rawType = questType && (questType.questionType || questType.type);
@@ -769,13 +873,64 @@ export default {
       }
       let isCompleted;
       if (Array.isArray(answer.contentArray)) {
-        isCompleted = answer.contentArray.length > 0;
+        // 填空题：检查数组中的答案是否都有值
+        isCompleted = answer.contentArray.length > 0 && answer.contentArray.every(a => a && a.trim());
       } else {
         isCompleted = !!(answer.content && answer.content.toString().trim());
       }
       console.log(`题目${itemOrder} completed状态更新:`, isCompleted, '内容:', answer.content);
       // 使用$set确保Vue能检测到变化
       this.$set(answer, 'completed', isCompleted);
+    },
+    // 获取填空题答案列表（根据标准答案数量初始化）
+    getFillBlankAnswerList(question) {
+      const answer = this.answerMap[question.itemOrder];
+      if (!answer) {
+        return [];
+      }
+      // 从标准答案中获取答案数量
+      let answerCount = 1;
+      if (question.correct) {
+        const answers = question.correct.split(',').map(a => a.trim()).filter(a => a);
+        answerCount = Math.max(1, answers.length);
+      }
+      // 初始化或更新答案数组
+      if (!answer.contentArray || answer.contentArray.length !== answerCount) {
+        answer.contentArray = new Array(answerCount).fill('').map((_, index) => {
+          // 如果已有答案，尝试恢复
+          if (answer.contentArray && answer.contentArray[index]) {
+            return answer.contentArray[index];
+          }
+          return '';
+        });
+        this.$set(answer, 'contentArray', answer.contentArray);
+      }
+      // 返回用于v-for的数组
+      return answer.contentArray.map((value, index) => ({
+        index,
+        value: value || ''
+      }));
+    },
+    // 更新填空题答案
+    updateFillBlankAnswer(itemOrder, index, value) {
+      const answer = this.answerMap[itemOrder];
+      if (!answer) {
+        console.warn('答案未找到，itemOrder:', itemOrder);
+        return;
+      }
+      if (!Array.isArray(answer.contentArray)) {
+        this.$set(answer, 'contentArray', []);
+      }
+      // 确保数组长度足够
+      while (answer.contentArray.length <= index) {
+        answer.contentArray.push('');
+      }
+      // 更新对应位置的答案（自动去除前后空格）
+      const trimmedValue = typeof value === 'string' ? value.trim() : value;
+      // 使用 $set 确保 Vue 能检测到数组索引的变化
+      this.$set(answer.contentArray, index, trimmedValue);
+      // 更新completed状态
+      this.updateCompletedStatus(itemOrder);
     },
     handleTextChange(itemOrder, payload = {}) {
       const answer = this.answerMap[itemOrder];
@@ -822,10 +977,12 @@ export default {
         let questionArray = paperQuestionTypeList[tIndex].questionDtos
         for (let qIndex in questionArray) {
           let question = questionArray[qIndex]
+          // 填空题使用contentArray存储多个答案
+          const isFillBlank = question.questionType === 5
           this.answer.questionAnswerDtos.push({
             questionId: question.id,
             content: '',//后续radio勾选后录入
-            contentArray: [],//同上
+            contentArray: isFillBlank ? [] : [],//填空题用数组存储多个答案
             completed: false,//同上
             itemOrder: question.itemOrder
           })
@@ -1059,7 +1216,32 @@ export default {
     async sendSubmitAnswerRequest() {
       window.clearInterval(this.timer)
       this.resetShuffleCache()
-      const res = await submitAnswer(this.answer)
+      
+      // 在提交前对答案进行处理：去除填空题答案中的空格
+      const processedAnswer = {
+        ...this.answer,
+        questionAnswerDtos: this.answer.questionAnswerDtos.map(answerDto => {
+          // 如果是填空题，对contentArray中的每个答案进行trim
+          if (Array.isArray(answerDto.contentArray) && answerDto.contentArray.length > 0) {
+            return {
+              ...answerDto,
+              contentArray: answerDto.contentArray.map(answer => {
+                return typeof answer === 'string' ? answer.trim() : answer
+              }).filter(answer => answer !== null && answer !== undefined && answer !== '')
+            }
+          }
+          // 其他题型也去除content的前后空格
+          if (answerDto.content && typeof answerDto.content === 'string') {
+            return {
+              ...answerDto,
+              content: answerDto.content.trim()
+            }
+          }
+          return answerDto
+        })
+      }
+      
+      const res = await submitAnswer(processedAnswer)
       if (res.code !== 200) {
         return
       }
@@ -1235,6 +1417,58 @@ export default {
 .question-title-content {
   display: inline;
   word-break: break-word;
+}
+
+/* Markdown 样式支持（题干） */
+.question-title-content.markdown-body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #24292e;
+  display: inline-block;
+}
+
+.question-title-content.markdown-body h1,
+.question-title-content.markdown-body h2,
+.question-title-content.markdown-body h3,
+.question-title-content.markdown-body h4,
+.question-title-content.markdown-body h5,
+.question-title-content.markdown-body h6 {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.question-title-content.markdown-body code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  background-color: rgba(27, 31, 35, 0.05);
+  border-radius: 3px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.question-title-content.markdown-body pre {
+  padding: 12px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: #f6f8fa;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+.question-title-content.markdown-body pre code {
+  display: inline;
+  max-width: auto;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  line-height: inherit;
+  word-wrap: normal;
+  background-color: transparent;
+  border: 0;
 }
 
 /* 全局强制覆盖题干图片尺寸 */
@@ -1413,5 +1647,58 @@ export default {
   margin: 5px 0;
   color: #666;
   font-style: italic;
+}
+
+/* Markdown 表格样式 */
+.question-title-content.markdown-body table,
+.option-text.markdown-body table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow: auto;
+  margin: 10px 0;
+}
+
+.question-title-content.markdown-body table th,
+.question-title-content.markdown-body table td,
+.option-text.markdown-body table th,
+.option-text.markdown-body table td {
+  padding: 6px 13px;
+  border: 1px solid #dcdfe6;
+}
+
+.question-title-content.markdown-body table th,
+.option-text.markdown-body table th {
+  font-weight: 600;
+  background-color: #f5f7fa;
+}
+
+/* 使用深度选择器确保样式应用到 v-html 注入的内容 */
+.question-title-content >>> table,
+.option-text >>> table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow: auto;
+  margin: 10px 0;
+  border: 1px solid #dcdfe6;
+}
+
+.question-title-content >>> table th,
+.question-title-content >>> table td,
+.option-text >>> table th,
+.option-text >>> table td {
+  padding: 6px 13px;
+  border: 1px solid #dcdfe6;
+}
+
+.question-title-content >>> table th,
+.option-text >>> table th {
+  font-weight: 600;
+  background-color: #f5f7fa;
 }
 </style>
