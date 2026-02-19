@@ -332,7 +332,6 @@ export default {
         console.error('获取科目列表失败:', error)
       }
     },
-    
     // 判断科目是否已选中
     isSubjectSelected(subjectId) {
       return this.selectedSubjects.some(s => s.subjectId === subjectId)
@@ -376,10 +375,8 @@ export default {
           try {
             let res
             if (this.isEdit) {
-              // 编辑模式，调用更新接口
               res = await updateKnowledge(this.editId, this.form)
             } else {
-              // 新增模式，调用发布接口
               res = await publishKnowledge(this.form)
             }
             
