@@ -493,10 +493,11 @@ export default {
       }
       
       getKnowledgePointList(params).then(response => {
+        if (this.activeTab !== 'plaza') return
         this.pointList = response.rows || []
         this.total = response.total || 0
       }).finally(() => {
-        this.loading = false
+        if (this.activeTab === 'plaza') this.loading = false
       })
     },
     
@@ -507,6 +508,7 @@ export default {
     },
     
     loadDataByTab() {
+      this.pointList = []
       switch (this.activeTab) {
         case 'plaza':
           this.loadPointList()
@@ -524,10 +526,11 @@ export default {
     loadRecommendPoints() {
       this.loading = true
       getRecommendPoints(10).then(response => {
+        if (this.activeTab !== 'plaza') return
         this.pointList = response.data || []
         this.total = this.pointList.length
       }).finally(() => {
-        this.loading = false
+        if (this.activeTab === 'plaza') this.loading = false
       })
     },
     viewDetail(point) {
@@ -638,13 +641,14 @@ export default {
       }
       
       getMyCollects(params).then(response => {
+        if (this.activeTab !== 'myCollects') return
         this.pointList = response.data || []
         this.total = this.pointList.length
       }).catch((error) => {
         console.error('加载收藏失败:', error)
-        this.$message.error('加载失败')
+        if (this.activeTab === 'myCollects') this.$message.error('加载失败')
       }).finally(() => {
-        this.loading = false
+        if (this.activeTab === 'myCollects') this.loading = false
       })
     },
     
@@ -862,12 +866,13 @@ export default {
         ...this.filterParams
       }
       getKnowledgePointList(params).then(response => {
+        if (this.activeTab !== 'myArticles') return
         this.pointList = response.rows || []
         this.total = response.total || 0
       }).catch(() => {
-        this.$message.error('加载失败')
+        if (this.activeTab === 'myArticles') this.$message.error('加载失败')
       }).finally(() => {
-        this.loading = false
+        if (this.activeTab === 'myArticles') this.loading = false
       })
     },
     applyFilter() {
