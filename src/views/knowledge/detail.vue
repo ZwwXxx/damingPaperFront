@@ -458,15 +458,16 @@ export default {
           this.pointDetail = baseResponse.data
         }
         
-        // 异步加载内容详情（大字段）
+        // 异步加载内容详情（大字段）- 该接口会同时触发后端增加浏览量
         const contentResponse = await getKnowledgePointContent(pointId)
         
-        // 前端组装完整数据
+        // 前端组装完整数据，并同步展示 +1 后的浏览量
         this.pointDetail = {
           ...this.pointDetail,
           content: contentResponse.data.content,
           contentHtml: contentResponse.data.contentHtml,
-          auditRemark: contentResponse.data.auditRemark
+          auditRemark: contentResponse.data.auditRemark,
+          viewCount: (this.pointDetail.viewCount || 0) + 1
         }
         
         console.log('详情数据加载完成', this.pointDetail)
