@@ -236,6 +236,18 @@
           <div class="item-header">
             <div class="header-left">
               <span class="title-text">{{ point.title }}</span>
+              <el-tag v-if="activeTab === 'myArticles' && point.auditStatus === 0" type="warning" size="mini" class="audit-tag">
+                待人工审核
+              </el-tag>
+              <el-tooltip v-else-if="activeTab === 'myArticles' && point.auditStatus === 2" content="点击查看拒绝原因" placement="top">
+                <span class="audit-reject-wrap" @click.stop="showRejectReason(point)">
+                  <el-tag type="danger" size="mini" class="audit-tag audit-tag-clickable">
+                    已拒绝
+                    <i class="el-icon-view el-icon--right"></i>
+                  </el-tag>
+                  <span class="audit-hint">点击查看原因</span>
+                </span>
+              </el-tooltip>
               <el-tag v-if="point.difficulty" :type="getDifficultyTag(point.difficulty)" size="mini" class="difficulty-tag">
                 {{ getDifficultyName(point.difficulty) }}
               </el-tag>
@@ -355,6 +367,7 @@
 import { 
   getSubjectList, 
   getKnowledgePointList, 
+  getKnowledgePointContent,
   getRecommendPoints, 
   toggleLike, 
   toggleCollect, 
@@ -539,6 +552,22 @@ export default {
         }
       }).catch(() => {
         this.$message.error('操作失败，请先登录')
+      })
+    },
+    /** 点击「已拒绝」查看拒绝原因 */
+    showRejectReason(point) {
+      getKnowledgePointContent(point.pointId).then(res => {
+        const remark = res.data && res.data.auditRemark
+        this.$alert(
+          remark || '管理员未填写拒绝原因',
+          `《${point.title}》审核未通过`,
+          {
+            confirmButtonText: '知道了',
+            type: remark ? 'warning' : 'info'
+          }
+        )
+      }).catch(() => {
+        this.$message.error('获取拒绝原因失败')
       })
     },
     
@@ -1031,6 +1060,34 @@ export default {
   font-weight: bold;
   color: #303133;
   margin-right: 10px;
+}
+.audit-tag {
+  margin-left: 8px;
+}
+.audit-tag-clickable {
+  cursor: pointer;
+}
+.audit-tag-clickable:hover {
+  opacity: 0.85;
+}
+.audit-reject-wrap {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  margin-left: 8px;
+}
+.audit-reject-wrap .audit-tag {
+  margin-left: 0;
+}
+.audit-hint {
+  margin-left: 4px;
+  font-size: 11px;
+  color: #909399;
+  white-space: nowrap;
+}
+.audit-reject-wrap:hover .audit-hint {
+  color: #e6a23c;
+  text-decoration: underline;
 }
 .difficulty-tag {
   margin-left: 10px;

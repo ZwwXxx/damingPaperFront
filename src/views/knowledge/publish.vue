@@ -177,8 +177,8 @@
                 </div>
               </el-form-item>
 
-              <el-form-item label="难度" prop="difficulty">
-                <el-select v-model="form.difficulty" placeholder="请选择难度" style="width: 100%">
+              <el-form-item label="难度（选填）" prop="difficulty">
+                <el-select v-model="form.difficulty" placeholder="选填，可不选" clearable style="width: 100%">
                   <el-option label="简单" :value="1" />
                   <el-option label="中等" :value="2" />
                   <el-option label="困难" :value="3" />
@@ -255,9 +255,6 @@ export default {
         ],
         subjectId: [
           { required: true, message: '请选择科目', trigger: 'change' }
-        ],
-        difficulty: [
-          { required: true, message: '请选择难度等级', trigger: 'change' }
         ],
         content: [
           { required: true, message: '请输入详细内容', trigger: 'blur' },
