@@ -41,7 +41,11 @@ export function updateInfo(data){
 export function logout() {
     return request({
         url: '/logout',
-        method: 'post'
+        method: 'post',
+        // 增加自定义 Header 标识平台
+        headers: {
+            'Platform-Type': '1' // '0' 代表后台，'1' 代表前台
+        }
     })
 }
 

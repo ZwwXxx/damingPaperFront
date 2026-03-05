@@ -1035,6 +1035,8 @@ export default {
   width: 100%;
 }
 .point-list {
+  position: relative;
+  width: 100%;
   min-height: 400px;
 }
 .point-item {
