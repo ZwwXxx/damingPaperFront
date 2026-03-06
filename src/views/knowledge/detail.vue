@@ -29,6 +29,25 @@
           </div>
         </div>
 
+        <div v-if="pointDetail.authorId" class="author-section">
+          <div class="author-info">
+            <img :src="authorAvatar" class="author-avatar" />
+            <div class="author-meta">
+              <div class="author-name">{{ authorName }}</div>
+              <div class="author-stats">粉丝 {{ followerCount }}</div>
+            </div>
+          </div>
+          <el-button
+            v-if="!isSelfAuthor"
+            :type="isFollowing ? 'success' : 'primary'"
+            :plain="isFollowing"
+            :loading="followLoading"
+            @click="toggleFollowStatus"
+          >
+            {{ isFollowing ? '已关注' : '关注' }}
+          </el-button>
+        </div>
+
         <el-divider></el-divider>
 
         <!-- 知识点内容 -->
@@ -356,6 +375,7 @@ import {
 import { marked } from 'marked'
 import { mapGetters } from 'vuex'
 import ElImageViewer from 'element-ui/packages/image/src/image-viewer'
+import { toggleFollow, isFollowing, countFollowers } from '@/api/user'
 
 export default {
   name: 'KnowledgeDetail',
@@ -366,6 +386,18 @@ export default {
     },
     currentUserId() {
       return this.$store.getters.userId || this.id
+    },
+    authorName() {
+      if (!this.pointDetail) return ''
+      if (this.pointDetail.authorName) return this.pointDetail.authorName
+      return this.pointDetail.authorId ? `用户${this.pointDetail.authorId}` : '未知作者'
+    },
+    authorAvatar() {
+      if (!this.pointDetail) return this.defaultAvatar
+      return this.pointDetail.authorAvatar || this.defaultAvatar
+    },
+    isSelfAuthor() {
+      return this.pointDetail && this.pointDetail.authorId && this.pointDetail.authorId === this.currentUserId
     },
     // 计算总评论数（一级评论 + 所有二级评论）
     totalCommentCount() {
@@ -403,6 +435,9 @@ export default {
       submittingReply: false,
       defaultAvatar: '/default-avatar.png',
       expandedComments: {}, // 存储每个评论的展开状态
+      isFollowing: false,
+      followerCount: 0,
+      followLoading: false,
       // 收藏夹相关数据
       userFolders: [], // 用户的收藏夹列表
       createFolderDialog: false,
@@ -471,6 +506,7 @@ export default {
         }
         
         console.log('详情数据加载完成', this.pointDetail)
+        await this.refreshFollowInfo()
         
       } catch (error) {
         console.error('加载失败:', error)
@@ -486,6 +522,60 @@ export default {
         })
         // 加载评论
         this.loadComments()
+      }
+    },
+    async refreshFollowInfo() {
+      const authorId = this.pointDetail && this.pointDetail.authorId
+      if (!authorId) {
+        this.isFollowing = false
+        return
+      }
+      try {
+        if (authorId === this.currentUserId) {
+          const countRes = await countFollowers(authorId)
+          const count = countRes ? (countRes.count ?? (countRes.data && countRes.data.count)) : 0
+          this.followerCount = typeof count === 'number' ? count : parseInt(count || 0, 10)
+          this.isFollowing = false
+        } else {
+          const [statusRes, countRes] = await Promise.all([
+            isFollowing(authorId),
+            countFollowers(authorId)
+          ])
+          const followFlag = statusRes ? (statusRes.isFollowed ?? (statusRes.data && statusRes.data.isFollowed)) : false
+          this.isFollowing = !!followFlag
+          const count = countRes ? (countRes.count ?? (countRes.data && countRes.data.count)) : 0
+          this.followerCount = typeof count === 'number' ? count : parseInt(count || 0, 10)
+        }
+      } catch (error) {
+        this.isFollowing = false
+      }
+    },
+    async toggleFollowStatus() {
+      const authorId = this.pointDetail && this.pointDetail.authorId
+      if (!authorId) return
+      if (authorId === this.currentUserId) {
+        this.$message.warning('不能关注自己')
+        return
+      }
+      if (!this.currentUserId) {
+        this.$message.error('请先登录')
+        return
+      }
+      const targetFollow = !this.isFollowing
+      this.followLoading = true
+      try {
+        const res = await toggleFollow(authorId, targetFollow)
+        if (res && res.code === 200) {
+          this.isFollowing = targetFollow
+          this.followerCount = Math.max(0, this.followerCount + (targetFollow ? 1 : -1))
+          this.$message.success(res.msg)
+        } else {
+          this.$message.error((res && res.msg) || '操作失败')
+        }
+      } catch (error) {
+        this.$message.error('操作失败，请先登录')
+      } finally {
+        this.followLoading = false
       }
     },
     /** 点赞 */
@@ -1282,6 +1372,48 @@ export default {
   color: #909399;
 }
 
+.author-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #f8fbff;
+  border: 1px solid #e4e7ed;
+  margin-bottom: 20px;
+}
+
+.author-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.author-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #e4e7ed;
+}
+
+.author-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.author-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.author-stats {
+  font-size: 12px;
+  color: #909399;
+}
+
 .summary-section,
 .content-section,
 .example-section,
@@ -2036,6 +2168,12 @@ export default {
     flex: 1;
   }
   
+  .author-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
   .directory-wrapper {
     display: none;
   }
