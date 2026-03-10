@@ -3,8 +3,8 @@
  * 统一的文件上传限制和验证
  */
 
-// 最大文件大小：2MB
-export const MAX_FILE_SIZE = 2 * 1024 * 1024
+// 最大文件大小：5MB
+export const MAX_FILE_SIZE = 5 * 1024 * 1024
 
 // 允许的图片类型
 export const ALLOWED_IMAGE_TYPES = [
@@ -87,7 +87,7 @@ export function validateUploadFile(file) {
   if (!validateFileSize(file)) {
     return { 
       valid: false, 
-      message: `文件大小不能超过2MB，当前大小：${formatFileSize(file.size)}` 
+      message: `文件大小不能超过5MB，当前大小：${formatFileSize(file.size)}` 
     }
   }
   

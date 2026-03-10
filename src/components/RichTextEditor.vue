@@ -190,7 +190,7 @@ export default {
         async handleUploadSuccess(res) {
             this.isUploading = false
             if (res.code !== 200) {
-                this.$message.error('图片插入失败')
+                this.$message.error(res.msg || '图片插入失败')
                 return
             }
             const quill = this.Quill
@@ -230,9 +230,10 @@ export default {
             }
             return `${base}${normalizedPath}`
         },
-        handleUploadError() {
+        handleUploadError(err) {
             this.isUploading = false
-            this.$message.error('图片插入失败')
+            const msg = err?.response?.data?.msg || err?.message || '图片插入失败'
+            this.$message.error(msg)
         },
         markInsertedImage(index, objectName, displayUrl) {
             if (!this.Quill) {

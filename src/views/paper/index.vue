@@ -8,12 +8,31 @@
     <!--左侧题目进度-->
     <el-card class="fixed top-20 left-0 w-1/4 ">
       <template v-if="!antiCheatActive">
-        <div class="questType" v-for="(questType,index) in formData.paperQuestionTypeDto" :key=index>
+        <!-- 按加入顺序：左侧不按题型分组，直接一列题号 -->
+        <template v-if="(formData.numberMode || 2) === 2">
+          <div class="questType">
+            <p class="mb-2">题目列表</p>
+            <div class="question-anchor flex flex-wrap">
+              <el-tag
+                  v-for="(question, qIndex) in orderedQuestions"
+                  :key="question.itemOrder"
+                  :type="getQuestionTagType(question.itemOrder)"
+                  @click="handleQuestionAnchorClick(question.itemOrder)"
+                  style="padding: 0; display: flex; justify-content: center; width: calc(20% - 10px); height: 30px;margin: 5px"
+                  :class="['cursor-pointer', {'current-question': question.itemOrder === currentQuestionOrder}]">
+                {{ getDisplayNumberByOrder(question.itemOrder) }}
+              </el-tag>
+            </div>
+          </div>
+        </template>
+
+        <!-- 按题型分组：左侧按题型分块 -->
+        <div v-else class="questType" v-for="(questType,index) in formData.paperQuestionTypeDto" :key=index>
           <p class="mb-2">{{ getQuestionTypeName(questType) }}</p>
         <div class="question-anchor  flex flex-wrap  ">
           <el-tag
               @click="handleQuestionAnchorClick(question.itemOrder)"
-              v-for="(question, qIndex) in questType.questionDtos" :key="qIndex"
+              v-for="(question, qIndex) in getAnchorQuestions(questType)" :key="qIndex"
               :type="getQuestionTagType(question.itemOrder)"
               style="padding: 0; display: flex; justify-content: center; width:  calc(20% - 10px); height: 30px;margin: 5px"
               :class="['cursor-pointer', {'current-question': question.itemOrder === currentQuestionOrder}]">
@@ -41,11 +60,190 @@
     </el-card>
     <!--中间题目内容-->
     <div class="container" v-if="!antiCheatActive">
-      <div class="questionTypeBody" v-for="(questType,index)  in formData.paperQuestionTypeDto" :key="index">
+      <!-- 按加入顺序：不按题型分组渲染 -->
+      <template v-if="(formData.numberMode || 2) === 2">
+        <div class="question-item p-4"
+             v-for="(it, idx) in getFlatDisplayItems()"
+             :key="idx">
+          <!-- 普通题 -->
+          <template v-if="it.kind === 'question'">
+            <div class="q-title">
+              <span class="break-words w-full">
+                <span>
+                  <span class="text-red-800 font-bold mr-2" :id="it.question.itemOrder">
+                    {{ getQuestionDisplayNumber(it.question) }}.
+                  </span>
+                  <span class="question-title-content"
+                        :class="{'markdown-body': it.question.questionTitleFormat === 'markdown'}"
+                        v-html="renderContent(it.question.questionTitle, it.question.questionTitleFormat)"></span>
+                </span>
+                <span class="font-bold text-red-600">
+                  ({{ it.question.score }}分)
+                </span>
+              </span>
+            </div>
+            <div class="q-options p-6 flex flex-col ">
+              <!-- 复用现有渲染：通过临时变量别名 -->
+              <template v-if="true">
+                <!-- 单选 -->
+                <el-radio-group
+                    v-if="it.question.questionType===1"
+                    v-removeAria
+                    v-model="answerMap[it.question.itemOrder].content"
+                    @change="handleSingleRadioChange(it.question.itemOrder, $event)">
+                  <el-radio class="py-2" :label="selection.prefix"
+                            v-for="(selection,index) in it.question.items" :key="index">
+                    <span class="option-content">
+                      <span class="option-prefix">{{ selection.prefix }}.</span>
+                      <span class="option-text" :class="{'markdown-body': it.question.optionFormat === 'markdown'}"
+                            v-html="renderContent(selection.content, it.question.optionFormat)"></span>
+                    </span>
+                  </el-radio>
+                </el-radio-group>
+                <!-- 多选 -->
+                <el-checkbox-group v-model="answerMap[it.question.itemOrder].contentArray"
+                                   v-if="it.question.questionType===2"
+                                   @change="updateCompletedStatus(it.question.itemOrder)">
+                  <el-checkbox v-for="(checkBox,index) in it.question.items" :label="checkBox.prefix" :key="index">
+                    <span class="option-content">
+                      <span class="option-prefix">{{ checkBox.prefix }}.</span>
+                      <span class="option-text" :class="{'markdown-body': it.question.optionFormat === 'markdown'}"
+                            v-html="renderContent(checkBox.content, it.question.optionFormat)"></span>
+                    </span>
+                  </el-checkbox>
+                </el-checkbox-group>
+                <!-- 判断 -->
+                <el-radio-group
+                    v-if="it.question.questionType===4"
+                    v-model="answerMap[it.question.itemOrder].content"
+                    @change="updateCompletedStatus(it.question.itemOrder)"
+                    v-removeAria>
+                  <el-radio class="py-2" :label="selection.prefix"
+                            v-for="(selection,index) in it.question.items" :key="index">
+                    <span class="option-content">
+                      <span class="option-prefix">{{ selection.prefix }}.</span>
+                      <span class="option-text" :class="{'markdown-body': it.question.optionFormat === 'markdown'}"
+                            v-html="renderContent(selection.content, it.question.optionFormat)"></span>
+                    </span>
+                  </el-radio>
+                </el-radio-group>
+                <!-- 主观 -->
+                <editor
+                    v-if="it.question.questionType===3"
+                    class="answer-rich-text"
+                    :min-height="220"
+                    :placeholder="'请输入答案（可插入图片、富文本）'"
+                    v-model="answerMap[it.question.itemOrder].content"
+                    @on-change="handleTextChange(it.question.itemOrder, $event)"
+                />
+                <!-- 填空 -->
+                <div v-if="it.question.questionType===5" class="fill-blank-answers">
+                  <div
+                      v-for="(answerItem, index) in getFillBlankAnswerList(it.question)"
+                      :key="index"
+                      class="fill-blank-item"
+                      style="margin-bottom: 15px;">
+                    <div style="font-weight: bold; margin-bottom: 5px; color: #606266;">
+                      第{{ index + 1 }}空：
+                    </div>
+                    <el-input
+                        :value="answerMap[it.question.itemOrder].contentArray[index] || ''"
+                        :placeholder="`请输入第${index + 1}空答案`"
+                        @input="updateFillBlankAnswer(it.question.itemOrder, index, $event)"
+                    />
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- 完形父题 + 子题 -->
+          <template v-else>
+            <div class="part bg-gray-100 p-4 text-black">
+              完形填空题（父题+子题）
+            </div>
+            <div class="q-title p-4">
+              <span class="question-title-content"
+                    :class="{'markdown-body': it.question.questionTitleFormat === 'markdown'}"
+                    v-html="renderContent(it.question.questionTitle, it.question.questionTitleFormat)"></span>
+            </div>
+            <div class="cloze-body p-6">
+              <div
+                  v-for="child in getClozeChildren(it.question)"
+                  :key="child.id"
+                  class="cloze-item mb-6 border-b pb-4">
+                <div class="font-bold mb-2 text-gray-700">
+                  <span class="text-red-800 font-bold mr-2" :id="child.itemOrder">
+                    {{ getQuestionDisplayNumber(child) }}.
+                  </span>
+                  （{{ child.score }}分）
+                </div>
+                <div v-if="child.questionTitle"
+                     class="mb-2"
+                     :class="{'markdown-body': child.questionTitleFormat === 'markdown'}"
+                     v-html="renderContent(child.questionTitle, child.questionTitleFormat)">
+                </div>
+                <el-radio-group
+                    v-if="child.questionType === 1"
+                    v-removeAria
+                    v-model="answerMap[child.itemOrder].content"
+                    @change="handleSingleRadioChange(child.itemOrder, $event)">
+                  <el-radio class="py-2" :label="selection.prefix"
+                            v-for="(selection,index) in child.items" :key="index">
+                    <span class="option-content">
+                      <span class="option-prefix">{{ selection.prefix }}.</span>
+                      <span class="option-text"
+                            :class="{'markdown-body': child.optionFormat === 'markdown'}"
+                            v-html="renderContent(selection.content, child.optionFormat)"></span>
+                    </span>
+                  </el-radio>
+                </el-radio-group>
+                <el-checkbox-group v-if="child.questionType === 2"
+                                   v-model="answerMap[child.itemOrder].contentArray"
+                                   @change="updateCompletedStatus(child.itemOrder)">
+                  <el-checkbox v-for="(checkBox,index) in child.items"
+                               :label="checkBox.prefix"
+                               :key="index">
+                    <span class="option-content">
+                      <span class="option-prefix">{{ checkBox.prefix }}.</span>
+                      <span class="option-text"
+                            :class="{'markdown-body': child.optionFormat === 'markdown'}"
+                            v-html="renderContent(checkBox.content, child.optionFormat)"></span>
+                    </span>
+                  </el-checkbox>
+                </el-checkbox-group>
+                <el-radio-group
+                    v-if="child.questionType === 4"
+                    v-model="answerMap[child.itemOrder].content"
+                    @change="updateCompletedStatus(child.itemOrder)"
+                    v-removeAria>
+                  <el-radio class="py-2" :label="selection.prefix"
+                            v-for="(selection,index) in child.items" :key="index">
+                    <span class="option-content">
+                      <span class="option-prefix">{{ selection.prefix }}.</span>
+                      <span class="option-text"
+                            :class="{'markdown-body': child.optionFormat === 'markdown'}"
+                            v-html="renderContent(selection.content, child.optionFormat)"></span>
+                    </span>
+                  </el-radio>
+                </el-radio-group>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <!-- 按题型分组：保持原有渲染 -->
+      <div v-else class="questionTypeBody" v-for="(questType,index)  in formData.paperQuestionTypeDto" :key="index">
         <div class="part bg-gray-100 p-4 text-black">
           {{ getQuestionTypeName(questType) }}
         </div>
-        <div class="question-item p-4" v-for="(questionItem,index) in questType.questionDtos" :key="index">
+        <div class="question-item p-4"
+             v-for="(questionItem,index) in questType.questionDtos"
+             :key="index"
+             v-if="!isClozeChild(questionItem)">
+          <!-- 普通题 & 非完形父题 -->
+          <template v-if="questionItem.questionType !== 6">
           <div class="q-title">
 
               <span class="break-words w-full">
@@ -148,6 +346,95 @@
               </div>
             </div>
           </div>
+          </template>
+
+          <!-- 完形填空父题：题干 + 多个子题（父题本身不占题号） -->
+          <template v-else>
+            <div class="q-title">
+              <span class="break-words w-full">
+                <span>
+                  <span class="question-title-content"
+                        :class="{'markdown-body': questionItem.questionTitleFormat === 'markdown'}"
+                        v-html="renderContent(questionItem.questionTitle, questionItem.questionTitleFormat)"></span>
+                </span>
+                <span class="font-bold text-red-600">
+                  （完形填空）
+                </span>
+              </span>
+            </div>
+
+            <div class="cloze-body p-6">
+              <div
+                  v-for="child in getClozeChildren(questionItem)"
+                  :key="child.id"
+                  class="cloze-item mb-6 border-b pb-4">
+                <div class="font-bold mb-2 text-gray-700">
+                  <!-- 子题按全局题号连续编号，父题不计入 -->
+                  <span class="text-red-800 font-bold mr-2" :id="child.itemOrder">
+                    {{ getQuestionDisplayNumber(child) }}.
+                  </span>
+                  <!-- 在按题型分组模式下，额外显示“第几空”提示 -->
+                  <span v-if="(formData.numberMode || 2) === 1">
+                    第{{ child.clozeIndex || 0 }}空
+                  </span>
+                  （{{ child.score }}分）
+                </div>
+                <!-- 子题题干（如果有单独题干的话） -->
+                <div v-if="child.questionTitle"
+                     class="mb-2"
+                     :class="{'markdown-body': child.questionTitleFormat === 'markdown'}"
+                     v-html="renderContent(child.questionTitle, child.questionTitleFormat)">
+                </div>
+                <!-- 单选 -->
+                <el-radio-group
+                    v-if="child.questionType === 1"
+                    v-removeAria
+                    v-model="answerMap[child.itemOrder].content"
+                    @change="handleSingleRadioChange(child.itemOrder, $event)">
+                  <el-radio class="py-2" :label="selection.prefix"
+                            v-for="(selection,index) in child.items" :key="index">
+                    <span class="option-content">
+                      <span class="option-prefix">{{ selection.prefix }}.</span>
+                      <span class="option-text"
+                            :class="{'markdown-body': child.optionFormat === 'markdown'}"
+                            v-html="renderContent(selection.content, child.optionFormat)"></span>
+                    </span>
+                  </el-radio>
+                </el-radio-group>
+                <!-- 多选 -->
+                <el-checkbox-group v-if="child.questionType === 2"
+                                   v-model="answerMap[child.itemOrder].contentArray"
+                                   @change="updateCompletedStatus(child.itemOrder)">
+                  <el-checkbox v-for="(checkBox,index) in child.items"
+                               :label="checkBox.prefix"
+                               :key="index">
+                    <span class="option-content">
+                      <span class="option-prefix">{{ checkBox.prefix }}.</span>
+                      <span class="option-text"
+                            :class="{'markdown-body': child.optionFormat === 'markdown'}"
+                            v-html="renderContent(checkBox.content, child.optionFormat)"></span>
+                    </span>
+                  </el-checkbox>
+                </el-checkbox-group>
+                <!-- 判断 -->
+                <el-radio-group
+                    v-if="child.questionType === 4"
+                    v-model="answerMap[child.itemOrder].content"
+                    @change="updateCompletedStatus(child.itemOrder)"
+                    v-removeAria>
+                  <el-radio class="py-2" :label="selection.prefix"
+                            v-for="(selection,index) in child.items" :key="index">
+                    <span class="option-content">
+                      <span class="option-prefix">{{ selection.prefix }}.</span>
+                      <span class="option-text"
+                            :class="{'markdown-body': child.optionFormat === 'markdown'}"
+                            v-html="renderContent(selection.content, child.optionFormat)"></span>
+                    </span>
+                  </el-radio>
+                </el-radio-group>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -385,7 +672,8 @@ export default {
         2: '多选题',
         3: '主观题',
         4: '判断题',
-        5: '填空题'
+        5: '填空题',
+        6: '完形填空题'
       },
       isCollapse: false,
       // 图片预览
@@ -458,6 +746,60 @@ export default {
     }
   },
   methods: {
+    // 是否为完形填空的子题（目前 parentId 有值的都视为完形子题）
+    isClozeChild(question) {
+      return question && question.parentId
+    },
+    // 左侧锚点题目列表：不展示完形父题，只展示可作答的小题
+    getAnchorQuestions(questType) {
+      if (!questType || !Array.isArray(questType.questionDtos)) {
+        return []
+      }
+      return questType.questionDtos.filter(q => q && q.questionType !== 6)
+    },
+
+    // 按加入顺序展示：顶层展示项（普通题 + 完形父题），按“首个子题/自身题序”排序
+    getFlatDisplayItems() {
+      const typeList = this.formData.paperQuestionTypeDto || []
+      const items = []
+      typeList.forEach(type => {
+        (type.questionDtos || []).forEach(q => {
+          if (!q) return
+          // 完形子题不作为顶层展示项
+          if (q.parentId) return
+          // 完形父题：用其首个子题的 itemOrder 作为排序键
+          if (q.questionType === 6) {
+            const children = this.getClozeChildren(q)
+            const firstOrder = children.length ? children[0].itemOrder : Number.MAX_SAFE_INTEGER
+            items.push({ kind: 'cloze', question: q, sortKey: firstOrder })
+            return
+          }
+          // 普通题：自身 itemOrder 作为排序键
+          items.push({ kind: 'question', question: q, sortKey: q.itemOrder })
+        })
+      })
+      return items.sort((a, b) => (a.sortKey || 0) - (b.sortKey || 0))
+    },
+    // 获取某个完形父题下的所有子题，按 clozeIndex 排序
+    getClozeChildren(parentQuestion) {
+      if (!parentQuestion || !this.formData || !Array.isArray(this.formData.paperQuestionTypeDto)) {
+        return []
+      }
+      const result = []
+      const parentId = parentQuestion.id
+      this.formData.paperQuestionTypeDto.forEach(type => {
+        (type.questionDtos || []).forEach(q => {
+          if (q && q.parentId === parentId) {
+            result.push(q)
+          }
+        })
+      })
+      return result.sort((a, b) => {
+        const ai = a.clozeIndex || 0
+        const bi = b.clozeIndex || 0
+        return ai - bi
+      })
+    },
     /**
      * 使用DOMPurify清理HTML内容，防止XSS攻击
      * @param {string} html - 原始HTML内容
@@ -977,6 +1319,10 @@ export default {
         let questionArray = paperQuestionTypeList[tIndex].questionDtos
         for (let qIndex in questionArray) {
           let question = questionArray[qIndex]
+          // 完形填空父题本身不需要作答，跳过
+          if (question.questionType === 6) {
+            continue
+          }
           // 填空题使用contentArray存储多个答案
           const isFillBlank = question.questionType === 5
           this.answer.questionAnswerDtos.push({
@@ -1002,6 +1348,10 @@ export default {
       const typeList = this.formData.paperQuestionTypeDto || []
       typeList.forEach((type) => {
         (type.questionDtos || []).forEach((question) => {
+          // 完形填空父题本身不参与编号与锚点，仅子题作为可作答题目
+          if (question && question.questionType === 6) {
+            return
+          }
           questionList.push({
             ...question,
             questTypeName: this.getQuestionTypeName(type)
@@ -1042,6 +1392,13 @@ export default {
       if (!question) {
         return ''
       }
+      // 按加入顺序：用当前缓存的顺序映射保证连续编号（兼容历史试卷存在父题占号导致的间断）
+      if ((this.formData.numberMode || 2) === 2) {
+        const index = this.questionIndexByOrder && this.questionIndexByOrder[question.itemOrder]
+        if (typeof index === 'number') {
+          return index + 1
+        }
+      }
       if (this.antiCheatEnabled && typeof question.displayOrder === 'number') {
         return question.displayOrder + 1
       }
@@ -1049,6 +1406,10 @@ export default {
     },
     getDisplayNumberByOrder(itemOrder) {
       const index = this.questionIndexByOrder[itemOrder]
+      // 按加入顺序：用 indexMap 保证连续编号
+      if ((this.formData.numberMode || 2) === 2 && typeof index === 'number') {
+        return index + 1
+      }
       if (this.antiCheatEnabled && typeof index === 'number') {
         return index + 1
       }
@@ -1105,29 +1466,24 @@ export default {
       if (this.antiCheatActive) {
         return
       }
-      const typeList = this.formData.paperQuestionTypeDto || []
-      if (!Array.isArray(typeList) || !typeList.length) {
+      const list = this.orderedQuestions || []
+      if (!Array.isArray(list) || !list.length) {
         return
       }
       const anchorTop = 120
       let nearestOrder = this.scrollCurrentQuestionOrder
       let minDistance = Number.POSITIVE_INFINITY
-      typeList.forEach(type => {
-        (type.questionDtos || []).forEach(question => {
-          const el = document.getElementById(question.itemOrder)
-          if (!el) {
-            return
-          }
-          const rect = el.getBoundingClientRect()
-          if (rect.bottom < 0 || rect.top > window.innerHeight) {
-            return
-          }
-          const distance = Math.abs(rect.top - anchorTop)
-          if (distance < minDistance) {
-            minDistance = distance
-            nearestOrder = question.itemOrder
-          }
-        })
+      list.forEach(question => {
+        if (!question || question.itemOrder === null || question.itemOrder === undefined) return
+        const el = document.getElementById(question.itemOrder)
+        if (!el) return
+        const rect = el.getBoundingClientRect()
+        if (rect.bottom < 0 || rect.top > window.innerHeight) return
+        const distance = Math.abs(rect.top - anchorTop)
+        if (distance < minDistance) {
+          minDistance = distance
+          nearestOrder = question.itemOrder
+        }
       })
       if (nearestOrder !== this.scrollCurrentQuestionOrder) {
         this.scrollCurrentQuestionOrder = nearestOrder
