@@ -33,7 +33,7 @@ import "quill/dist/quill.snow.css";
 import "quill/dist/quill.bubble.css";
 import { getToken } from "@/utils/auth";
 import ElImageViewer from "element-ui/packages/image/src/image-viewer";
-import { validateUploadFile } from "@/utils/upload";
+import { validateUploadFile, compressImageIfNeeded } from "@/utils/upload";
 
 export default {
   name: "Editor",
@@ -183,15 +183,15 @@ export default {
       // 绑定图片预览事件
       this.bindImagePreviewEvents();
     },
-    // 上传前校检格式和大小
-    handleBeforeUpload(file) {
-      // ⭐ 使用统一的文件验证
+    // 上传前校检格式和大小，超过 500KB 的图片静默压缩到约 1MB
+    async handleBeforeUpload(file) {
       const validation = validateUploadFile(file);
       if (!validation.valid) {
         this.$message.error(validation.message);
         return false;
       }
-      return true;
+      const compressed = await compressImageIfNeeded(file);
+      return compressed;
     },
     handleUploadSuccess(res, file) {
       // 如果上传成功
