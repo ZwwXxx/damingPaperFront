@@ -26,7 +26,7 @@ import 'quill/dist/quill.snow.css'
 import 'quill/dist/quill.bubble.css'
 import { getToken } from '@/utils/auth'
 import ElImageViewer from 'element-ui/packages/image/src/image-viewer'
-import { validateUploadFile, compressImageIfNeeded } from '@/utils/upload'
+import { validateUploadFile } from '@/utils/upload'
 
 export default {
     name: 'RichTextEditor',
@@ -176,15 +176,16 @@ export default {
             })
             this.bindImagePreviewEvents()
         },
-        async handleBeforeUpload(file) {
+        handleBeforeUpload(file) {
+            // ⭐ 使用统一的文件验证
             const validation = validateUploadFile(file);
             if (!validation.valid) {
                 this.$message.error(validation.message);
                 return false;
             }
+            
             this.isUploading = true
-            const compressed = await compressImageIfNeeded(file);
-            return compressed
+            return true
         },
         async handleUploadSuccess(res) {
             this.isUploading = false

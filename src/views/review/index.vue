@@ -18,14 +18,15 @@
         <div v-for="(questionType,index) in paperDto.paperQuestionTypeDto" :key="index">
           <p>{{ questionType.name }}</p>
           <div class="question-anchor  flex flex-wrap  ">
+            <!-- 完形父题不占题号，只显示可作答题目（普通题+完形子题） -->
             <el-tag
                 @click="jumpTo(question.itemOrder)"
-                v-for="(question, qIndex) in questionType.questionDtos" :key="qIndex"
+                v-for="(question, qIndex) in getAnchorQuestions(questionType)" :key="qIndex"
                 :type="getQuestionTagType(question)"
                 style="padding: 0; display: flex; justify-content: center; width:  calc(20% - 10px); height: 30px;margin: 5px"
                 class="cursor-pointer"
                 :class="{'tag-active': activeQuestionOrder === question.itemOrder}">
-              {{ question.itemOrder + 1 }}
+              {{ (question.itemOrder != null ? question.itemOrder : 0) + 1 }}
             </el-tag>
           </div>
         </div>
@@ -35,161 +36,123 @@
           <div class="part bg-gray-100 p-4 text-black">
             {{ questionType.name }}
           </div>
-          <div class="question-item p-4" v-for="(question,index) in questionType.questionDtos" :key="index">
-            <div class="q-title" :id="question.itemOrder">
-              <p>
-                <span>{{ question.itemOrder + 1 }}. </span>
-                <span class="question-title-content" :class="{'markdown-body': question.questionTitleFormat === 'markdown'}" v-html="renderContent(question.questionTitle, question.questionTitleFormat)"></span>
-                <span>( {{ question.score }}分 )</span>
-              </p>
-            </div>
-            <div class="q-options p-6 flex flex-col ">
-              <el-radio-group
-                  v-if="question.questionType===1 && answerMap[question.itemOrder]"
-                  v-removeAria
-                  v-model="answerMap[question.itemOrder].content"
-                  @change="answerMap[question.itemOrder].completed = true">
-                <el-radio
-                    disabled
-                    class="py-2" :label="selection.prefix"
-                    v-for="(selection,index) in question.items" :key="index">
-                  <span class="option-content">
-                    <span class="option-prefix">{{ selection.prefix }}.</span>
-                    <span class="option-text" :class="{'markdown-body': question.optionFormat === 'markdown'}" v-html="renderContent(selection.content, question.optionFormat)"></span>
-                  </span>
-                </el-radio>
-              </el-radio-group>
-              <el-checkbox-group v-model="answerMap[question.itemOrder].contentArray"
-                                 v-if="question.questionType===2 && answerMap[question.itemOrder]">
-                <el-checkbox disabled v-for="(checkBox,index) in question.items" :label="checkBox.prefix" :key="index">
-                  <span class="option-content">
-                    <span class="option-prefix">{{ checkBox.prefix }}.</span>
-                    <span class="option-text" :class="{'markdown-body': question.optionFormat === 'markdown'}" v-html="renderContent(checkBox.content, question.optionFormat)"></span>
-                  </span>
-                </el-checkbox>
-              </el-checkbox-group>
-            </div>
-            <div class="reviewInfo  p-6 flex flex-col text-sm">
-              <div class="answer-row">
-                <span class="label">标准答案</span>
-                <span class="value" v-if="question.questionType===1 || question.questionType===4 || question.questionType===5">{{ question.correct }}</span>
-                <span class="value" v-else>{{ question.correctArray }}</span>
+          <!-- 完形父题只作材料展示，不渲染题号/答案；子题与普通题正常渲染 -->
+          <template v-for="(displayItem, dIndex) in getDisplayItems(questionType)">
+            <!-- 完形父题：仅展示题干材料，不显示题号、标准答案、你的答案、结果 -->
+            <div v-if="displayItem.kind === 'cloze'" :key="'cloze-' + dIndex" class="cloze-parent-block p-4">
+              <div class="q-title">
+                <span class="break-words w-full">
+                  <span class="question-title-content" :class="{'markdown-body': displayItem.question.questionTitleFormat === 'markdown'}" v-html="renderContent(displayItem.question.questionTitle, displayItem.question.questionTitleFormat)"></span>
+                  <span class="font-bold text-red-600">（完形填空）</span>
+                </span>
               </div>
-              <div class="answer-row">
-                <span class="label">你的答案</span>
-                <template v-if="question.questionType===3">
-                  <div v-if="answerMap[question.itemOrder] && answerMap[question.itemOrder].content"
-                      class="value rich-answer">
-                    <div class="rich-answer-wrapper"
-                         :class="{'is-collapsed': shouldCollapseAnswer(question.itemOrder)}">
-                      <div
-                          class="rich-answer-content"
-                          :ref="'answer-' + question.itemOrder"
-                          v-html="answerMap[question.itemOrder].content">
-                      </div>
-                    </div>
-                    <div v-if="shouldShowAnswerToggle(question.itemOrder)" class="rich-answer-toggle">
-                      <button
-                          type="button"
-                          class="answer-toggle-btn"
-                          @click="toggleAnswerCollapse(question.itemOrder)">
-                        {{ isAnswerExpanded(question.itemOrder) ? '收起' : '展开全部' }}
-                      </button>
-                    </div>
+              <div class="cloze-body p-6">
+                <div class="cloze-children-header">
+                  <span class="cloze-children-title">本材料下完形子题</span>
+                  <span class="cloze-children-subtitle">
+                    （共 {{ getClozeChildren(displayItem.question).length }} 题，题号与左侧导航一致）
+                  </span>
+                </div>
+                <div v-for="child in getClozeChildren(displayItem.question)" :key="child.id" class="cloze-item mb-6 border-b pb-4 question-item cloze-child-item">
+                  <div class="q-title" :id="child.itemOrder">
+                    <p>
+                      <span>{{ (child.itemOrder != null ? child.itemOrder : 0) + 1 }}. </span>
+                      <span class="question-title-content" :class="{'markdown-body': child.questionTitleFormat === 'markdown'}" v-html="renderContent(child.questionTitle, child.questionTitleFormat)"></span>
+                      <span>( {{ child.score }}分 )</span>
+                    </p>
                   </div>
-                  <span class="value empty-answer" v-else>未作答</span>
-                </template>
-                <template v-else-if="question.questionType===5">
-                  <!-- 填空题：优先使用contentArray，如果没有则尝试从content解析 -->
-                  <template v-if="answerMap[question.itemOrder]">
-                    <span class="value" v-if="answerMap[question.itemOrder].contentArray && answerMap[question.itemOrder].contentArray.length > 0">{{
-                      answerMap[question.itemOrder].contentArray.join(', ')
-                    }}</span>
-                    <span class="value" v-else-if="answerMap[question.itemOrder].content && answerMap[question.itemOrder].content !== '未填' && answerMap[question.itemOrder].content.trim() !== ''">{{
-                      answerMap[question.itemOrder].content
-                    }}</span>
+                  <div class="q-options p-6 flex flex-col ">
+                    <el-radio-group v-if="child.questionType===1 && answerMap[child.itemOrder]" v-removeAria v-model="answerMap[child.itemOrder].content">
+                      <el-radio disabled class="py-2" :label="selection.prefix" v-for="(selection,sIdx) in child.items" :key="sIdx">
+                        <span class="option-content"><span class="option-prefix">{{ selection.prefix }}.</span><span class="option-text" :class="{'markdown-body': child.optionFormat === 'markdown'}" v-html="renderContent(selection.content, child.optionFormat)"></span></span>
+                      </el-radio>
+                    </el-radio-group>
+                    <el-checkbox-group v-model="answerMap[child.itemOrder].contentArray" v-if="child.questionType===2 && answerMap[child.itemOrder]">
+                      <el-checkbox disabled v-for="(checkBox,sIdx) in child.items" :label="checkBox.prefix" :key="sIdx">
+                        <span class="option-content"><span class="option-prefix">{{ checkBox.prefix }}.</span><span class="option-text" :class="{'markdown-body': child.optionFormat === 'markdown'}" v-html="renderContent(checkBox.content, child.optionFormat)"></span></span>
+                      </el-checkbox>
+                    </el-checkbox-group>
+                  </div>
+                  <div class="reviewInfo p-6 flex flex-col text-sm">
+                    <div class="answer-row"><span class="label">标准答案</span><span class="value" v-if="child.questionType===1||child.questionType===4||child.questionType===5">{{ child.correct }}</span><span class="value" v-else>{{ child.correctArray }}</span></div>
+                    <div class="answer-row"><span class="label">你的答案</span>
+                      <template v-if="child.questionType===3">
+                        <div v-if="answerMap[child.itemOrder]&&answerMap[child.itemOrder].content" class="value rich-answer"><div class="rich-answer-wrapper" :class="{'is-collapsed':shouldCollapseAnswer(child.itemOrder)}"><div class="rich-answer-content" :ref="'answer-'+child.itemOrder" v-html="answerMap[child.itemOrder].content"></div></div><div v-if="shouldShowAnswerToggle(child.itemOrder)" class="rich-answer-toggle"><button type="button" class="answer-toggle-btn" @click="toggleAnswerCollapse(child.itemOrder)">{{ isAnswerExpanded(child.itemOrder)?'收起':'展开全部' }}</button></div></div>
+                        <span class="value empty-answer" v-else>未作答</span>
+                      </template>
+                      <template v-else-if="child.questionType===5">
+                        <template v-if="answerMap[child.itemOrder]"><span class="value" v-if="answerMap[child.itemOrder].contentArray&&answerMap[child.itemOrder].contentArray.length>0">{{ answerMap[child.itemOrder].contentArray.join(', ') }}</span><span class="value" v-else-if="answerMap[child.itemOrder].content&&answerMap[child.itemOrder].content!=='未填'&&answerMap[child.itemOrder].content.trim()!==''">{{ answerMap[child.itemOrder].content }}</span><span class="value empty-answer" v-else>未作答</span></template>
+                        <span class="value empty-answer" v-else>未作答</span>
+                      </template>
+                      <span class="value" v-else-if="child.questionType===1||child.questionType===4">{{ answerMap[child.itemOrder]?answerMap[child.itemOrder].content:'' }}</span>
+                      <span class="value" v-else>{{ (answerMap[child.itemOrder]&&answerMap[child.itemOrder].contentArray||[]).join(', ') }}</span>
+                    </div>
+                    <div class="answer-row"><span class="label">结果</span>
+                      <template v-if="child.questionType===3"><el-tag size="mini" :type="getSubjectiveStatusTag(child).type">{{ getSubjectiveStatusTag(child).text }}</el-tag></template>
+                      <template v-else><el-tag type="success" size="mini" v-if="answerMap[child.itemOrder]&&answerMap[child.itemOrder].correct">正确</el-tag><el-tag type="danger" size="mini" v-else>错误</el-tag></template>
+                    </div>
+                    <div class="answer-row" v-if="child.questionType===3"><span class="label">得分</span><span class="value score-value">{{ getSubjectiveScoreText(child) }}</span></div>
+                    <div class="answer-row" v-if="child.questionType===3"><span class="label">评语</span><span class="value comment-value" v-if="getSubjectiveComment(child)">{{ getSubjectiveComment(child) }}</span><span class="value comment-empty" v-else>老师暂未填写评语</span></div>
+                    <div class="knowledge-points-row" v-if="questionKnowledgeMap[child.id]&&questionKnowledgeMap[child.id].length>0"><span class="label">📚 相关知识点</span><div class="knowledge-tags"><el-tag v-for="kp in questionKnowledgeMap[child.id]" :key="kp.pointId" size="small" :type="child.isCorrect===false?'danger':'success'" class="knowledge-tag" @click="gotoKnowledge(kp.pointId)">{{ kp.title }}</el-tag></div></div>
+                    <div class="action-row">
+                      <el-button size="mini" type="primary" plain @click="toggleAnalysis(child.itemOrder)">{{ expandedAnalysis[child.itemOrder]?'收起解析':'展开解析' }}</el-button>
+                      <el-button size="mini" plain :type="isFavorite(child.id)?'warning':'info'" @click="toggleFavorite(child)">{{ isFavorite(child.id)?'已收藏':'收藏' }}</el-button>
+                    </div>
+                    <transition name="fade"><div class="analysis-wrap" v-if="expandedAnalysis[child.itemOrder]"><div class="analysis-header"><span class="title">解析</span></div><div class="analysis-content" :class="{'markdown-body':child.analysisFormat==='markdown'}" v-if="child.analysis" v-html="renderAnalysis(child)" :ref="'analysis-'+child.itemOrder"></div><div class="analysis-empty" v-else>暂无解析</div></div></transition>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- 普通题 -->
+            <div v-else class="question-item p-4" :key="'q-' + dIndex">
+              <div class="q-title" :id="displayItem.question.itemOrder">
+                <p>
+                  <span>{{ (displayItem.question.itemOrder != null ? displayItem.question.itemOrder : 0) + 1 }}. </span>
+                  <span class="question-title-content" :class="{'markdown-body': displayItem.question.questionTitleFormat === 'markdown'}" v-html="renderContent(displayItem.question.questionTitle, displayItem.question.questionTitleFormat)"></span>
+                  <span>( {{ displayItem.question.score }}分 )</span>
+                </p>
+              </div>
+              <div class="q-options p-6 flex flex-col ">
+                <el-radio-group v-if="displayItem.question.questionType===1 && answerMap[displayItem.question.itemOrder]" v-removeAria v-model="answerMap[displayItem.question.itemOrder].content">
+                  <el-radio disabled class="py-2" :label="selection.prefix" v-for="(selection,index) in displayItem.question.items" :key="index">
+                    <span class="option-content"><span class="option-prefix">{{ selection.prefix }}.</span><span class="option-text" :class="{'markdown-body': displayItem.question.optionFormat === 'markdown'}" v-html="renderContent(selection.content, displayItem.question.optionFormat)"></span></span>
+                  </el-radio>
+                </el-radio-group>
+                <el-checkbox-group v-model="answerMap[displayItem.question.itemOrder].contentArray" v-if="displayItem.question.questionType===2 && answerMap[displayItem.question.itemOrder]">
+                  <el-checkbox disabled v-for="(checkBox,index) in displayItem.question.items" :label="checkBox.prefix" :key="index">
+                    <span class="option-content"><span class="option-prefix">{{ checkBox.prefix }}.</span><span class="option-text" :class="{'markdown-body': displayItem.question.optionFormat === 'markdown'}" v-html="renderContent(checkBox.content, displayItem.question.optionFormat)"></span></span>
+                  </el-checkbox>
+                </el-checkbox-group>
+              </div>
+              <div class="reviewInfo p-6 flex flex-col text-sm">
+                <div class="answer-row"><span class="label">标准答案</span><span class="value" v-if="displayItem.question.questionType===1||displayItem.question.questionType===4||displayItem.question.questionType===5">{{ displayItem.question.correct }}</span><span class="value" v-else>{{ displayItem.question.correctArray }}</span></div>
+                <div class="answer-row"><span class="label">你的答案</span>
+                  <template v-if="displayItem.question.questionType===3">
+                    <div v-if="answerMap[displayItem.question.itemOrder]&&answerMap[displayItem.question.itemOrder].content" class="value rich-answer"><div class="rich-answer-wrapper" :class="{'is-collapsed':shouldCollapseAnswer(displayItem.question.itemOrder)}"><div class="rich-answer-content" :ref="'answer-'+displayItem.question.itemOrder" v-html="answerMap[displayItem.question.itemOrder].content"></div></div><div v-if="shouldShowAnswerToggle(displayItem.question.itemOrder)" class="rich-answer-toggle"><button type="button" class="answer-toggle-btn" @click="toggleAnswerCollapse(displayItem.question.itemOrder)">{{ isAnswerExpanded(displayItem.question.itemOrder)?'收起':'展开全部' }}</button></div></div>
                     <span class="value empty-answer" v-else>未作答</span>
                   </template>
-                  <span class="value empty-answer" v-else>未作答</span>
-                </template>
-                <span class="value" v-else-if="question.questionType===1 || question.questionType===4">{{
-                    answerMap[question.itemOrder] ? answerMap[question.itemOrder].content : ''
-                  }}</span>
-                <span class="value" v-else>{{
-                    (answerMap[question.itemOrder] && answerMap[question.itemOrder].contentArray || []).join(', ')
-                  }}</span>
-              </div>
-              <div class="answer-row">
-                <span class="label">结果</span>
-                <template v-if="question.questionType===3">
-                  <el-tag
-                      size="mini"
-                      :type="getSubjectiveStatusTag(question).type">
-                    {{ getSubjectiveStatusTag(question).text }}
-                  </el-tag>
-                </template>
-                <template v-else>
-                <el-tag type="success" size="mini"
-                          v-if="answerMap[question.itemOrder] && answerMap[question.itemOrder].correct">正确
-                </el-tag>
-                <el-tag type="danger" size="mini" v-else>错误</el-tag>
-                </template>
-              </div>
-              <div class="answer-row" v-if="question.questionType===3">
-                <span class="label">得分</span>
-                <span class="value score-value">{{ getSubjectiveScoreText(question) }}</span>
-              </div>
-              <div class="answer-row" v-if="question.questionType===3">
-                <span class="label">评语</span>
-                <span class="value comment-value" v-if="getSubjectiveComment(question)">{{ getSubjectiveComment(question) }}</span>
-                <span class="value comment-empty" v-else>老师暂未填写评语</span>
-              </div>
-              <div class="knowledge-points-row" v-if="questionKnowledgeMap[question.id] && questionKnowledgeMap[question.id].length > 0">
-                <span class="label">📚 相关知识点</span>
-                <div class="knowledge-tags">
-                  <el-tag
-                    v-for="kp in questionKnowledgeMap[question.id]"
-                    :key="kp.pointId"
-                    size="small"
-                    :type="question.isCorrect === false ? 'danger' : 'success'"
-                    class="knowledge-tag"
-                    @click="gotoKnowledge(kp.pointId)">
-                    {{ kp.title }}
-                  </el-tag>
+                  <template v-else-if="displayItem.question.questionType===5">
+                    <template v-if="answerMap[displayItem.question.itemOrder]"><span class="value" v-if="answerMap[displayItem.question.itemOrder].contentArray&&answerMap[displayItem.question.itemOrder].contentArray.length>0">{{ answerMap[displayItem.question.itemOrder].contentArray.join(', ') }}</span><span class="value" v-else-if="answerMap[displayItem.question.itemOrder].content&&answerMap[displayItem.question.itemOrder].content!=='未填'&&answerMap[displayItem.question.itemOrder].content.trim()!==''">{{ answerMap[displayItem.question.itemOrder].content }}</span><span class="value empty-answer" v-else>未作答</span></template>
+                    <span class="value empty-answer" v-else>未作答</span>
+                  </template>
+                  <span class="value" v-else-if="displayItem.question.questionType===1||displayItem.question.questionType===4">{{ answerMap[displayItem.question.itemOrder]?answerMap[displayItem.question.itemOrder].content:'' }}</span>
+                  <span class="value" v-else>{{ (answerMap[displayItem.question.itemOrder]&&answerMap[displayItem.question.itemOrder].contentArray||[]).join(', ') }}</span>
                 </div>
-              </div>
-              <div class="action-row">
-                <el-button
-                    size="mini"
-                    type="primary"
-                    plain
-                    @click="toggleAnalysis(question.itemOrder)">
-                  {{ expandedAnalysis[question.itemOrder] ? '收起解析' : '展开解析' }}
-                </el-button>
-                <el-button
-                    size="mini"
-                    plain
-                    :type="isFavorite(question.id) ? 'warning' : 'info'"
-                    @click="toggleFavorite(question)">
-                  {{ isFavorite(question.id) ? '已收藏' : '收藏' }}
-                </el-button>
-              </div>
-              <transition name="fade">
-                <div class="analysis-wrap" v-if="expandedAnalysis[question.itemOrder]">
-                  <div class="analysis-header">
-                    <span class="title">解析</span>
-                  </div>
-                  <div
-                      class="analysis-content"
-                      :class="{'markdown-body': question.analysisFormat === 'markdown'}"
-                      v-if="question.analysis"
-                      v-html="renderAnalysis(question)"
-                      :ref="'analysis-' + question.itemOrder"></div>
-                  <div class="analysis-empty" v-else>暂无解析</div>
+                <div class="answer-row"><span class="label">结果</span>
+                  <template v-if="displayItem.question.questionType===3"><el-tag size="mini" :type="getSubjectiveStatusTag(displayItem.question).type">{{ getSubjectiveStatusTag(displayItem.question).text }}</el-tag></template>
+                  <template v-else><el-tag type="success" size="mini" v-if="answerMap[displayItem.question.itemOrder]&&answerMap[displayItem.question.itemOrder].correct">正确</el-tag><el-tag type="danger" size="mini" v-else>错误</el-tag></template>
                 </div>
-              </transition>
+                <div class="answer-row" v-if="displayItem.question.questionType===3"><span class="label">得分</span><span class="value score-value">{{ getSubjectiveScoreText(displayItem.question) }}</span></div>
+                <div class="answer-row" v-if="displayItem.question.questionType===3"><span class="label">评语</span><span class="value comment-value" v-if="getSubjectiveComment(displayItem.question)">{{ getSubjectiveComment(displayItem.question) }}</span><span class="value comment-empty" v-else>老师暂未填写评语</span></div>
+                <div class="knowledge-points-row" v-if="questionKnowledgeMap[displayItem.question.id]&&questionKnowledgeMap[displayItem.question.id].length>0"><span class="label">📚 相关知识点</span><div class="knowledge-tags"><el-tag v-for="kp in questionKnowledgeMap[displayItem.question.id]" :key="kp.pointId" size="small" :type="displayItem.question.isCorrect===false?'danger':'success'" class="knowledge-tag" @click="gotoKnowledge(kp.pointId)">{{ kp.title }}</el-tag></div></div>
+                <div class="action-row">
+                  <el-button size="mini" type="primary" plain @click="toggleAnalysis(displayItem.question.itemOrder)">{{ expandedAnalysis[displayItem.question.itemOrder]?'收起解析':'展开解析' }}</el-button>
+                  <el-button size="mini" plain :type="isFavorite(displayItem.question.id)?'warning':'info'" @click="toggleFavorite(displayItem.question)">{{ isFavorite(displayItem.question.id)?'已收藏':'收藏' }}</el-button>
+                </div>
+                <transition name="fade"><div class="analysis-wrap" v-if="expandedAnalysis[displayItem.question.itemOrder]"><div class="analysis-header"><span class="title">解析</span></div><div class="analysis-content" :class="{'markdown-body':displayItem.question.analysisFormat==='markdown'}" v-if="displayItem.question.analysis" v-html="renderAnalysis(displayItem.question)" :ref="'analysis-'+displayItem.question.itemOrder"></div><div class="analysis-empty" v-else>暂无解析</div></div></transition>
+              </div>
             </div>
-          </div>
+          </template>
         </div>
       </div>
 
@@ -465,13 +428,17 @@ export default {
     bindAllAnalysisImages() {
       if (!this.paperDto?.paperQuestionTypeDto) return
       this.paperDto.paperQuestionTypeDto.forEach(type => {
-        type.questionDtos.forEach(q => this.bindAnalysisImages(q.itemOrder))
+        (type.questionDtos || []).forEach(q => {
+          if (q && q.itemOrder != null) this.bindAnalysisImages(q.itemOrder)
+        })
       })
     },
     bindAllAnswerImages() {
       if (!this.paperDto?.paperQuestionTypeDto) return
       this.paperDto.paperQuestionTypeDto.forEach(type => {
-        type.questionDtos.forEach(q => this.bindAnswerImages(q.itemOrder))
+        (type.questionDtos || []).forEach(q => {
+          if (q && q.itemOrder != null) this.bindAnswerImages(q.itemOrder)
+        })
       })
     },
     async bindAnalysisImages(itemOrder) {
@@ -1051,6 +1018,38 @@ export default {
         name: 'knowledgeDetail',
         params: { pointId }
       })
+    },
+    /** 左侧题号：排除完形父题，只显示可作答题目（普通题+完形子题） */
+    getAnchorQuestions(questionType) {
+      const list = questionType?.questionDtos || []
+      return list.filter(q => q && q.questionType !== 6)
+    },
+    /** 右侧展示项：完形父题作为材料块，子题随父题渲染；普通题单独渲染 */
+    getDisplayItems(questionType) {
+      const list = questionType?.questionDtos || []
+      const items = []
+      list.forEach(q => {
+        if (!q) return
+        if (q.parentId) return // 完形子题随父题一起渲染，此处跳过
+        if (q.questionType === 6) {
+          items.push({ kind: 'cloze', question: q })
+          return
+        }
+        items.push({ kind: 'question', question: q })
+      })
+      return items
+    },
+    /** 获取完形父题下的所有子题，按 clozeIndex 排序 */
+    getClozeChildren(parentQuestion) {
+      if (!parentQuestion || !this.paperDto?.paperQuestionTypeDto) return []
+      const parentId = parentQuestion.id
+      const result = []
+      this.paperDto.paperQuestionTypeDto.forEach(type => {
+        (type.questionDtos || []).forEach(q => {
+          if (q && q.parentId === parentId) result.push(q)
+        })
+      })
+      return result.sort((a, b) => (a.clozeIndex || 0) - (b.clozeIndex || 0))
     }
 
   }
@@ -1419,6 +1418,35 @@ export default {
 .knowledge-tag:hover {
   transform: translateY(-2px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 完形父题块与子题视觉归属 */
+.cloze-parent-block {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background-color: #f9fafb;
+  margin-bottom: 20px;
+}
+.cloze-body {
+  margin-top: 8px;
+}
+.cloze-children-header {
+  padding: 6px 10px 10px;
+  font-size: 13px;
+  color: #4b5563;
+}
+.cloze-children-title {
+  font-weight: 600;
+  color: #1f2937;
+  margin-right: 4px;
+}
+.cloze-children-subtitle {
+  color: #9ca3af;
+}
+.cloze-child-item {
+  margin-left: 12px;
+  padding-left: 12px;
+  border-left: 3px solid #e5e7eb;
 }
 
 .question-title-content ol,
