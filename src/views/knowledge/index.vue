@@ -27,6 +27,11 @@
         </el-tabs>
         
         <div class="tab-actions">
+          <template v-if="activeTab === 'myArticles'">
+            <el-button size="small" icon="el-icon-download" @click="handleExportKnowledge">导出我的知识点</el-button>
+            <el-button size="small" icon="el-icon-upload2" @click="triggerImportFile">导入知识点</el-button>
+            <input ref="importFileInput" type="file" accept=".json" style="display: none" @change="handleImportFile" />
+          </template>
           <el-button type="primary" size="small" icon="el-icon-edit" @click="goPublish">
             发布知识点
           </el-button>
@@ -377,7 +382,9 @@ import {
   createFolder,
   updateFolder,
   deleteFolder,
-  collectToFolder
+  collectToFolder,
+  exportMyKnowledge,
+  importKnowledge
 } from '@/api/knowledge'
 
 export default {
@@ -670,6 +677,72 @@ export default {
     
     goPublish() {
       this.$router.push({ name: 'knowledgePublish' })
+    },
+    /** 导出我的知识点为 JSON 文件（便于备份或正式环境导入） */
+    async handleExportKnowledge() {
+      try {
+        const res = await exportMyKnowledge()
+        if (res.code !== 200 || !res.data) {
+          this.$message.warning(res.msg || '暂无数据可导出')
+          return
+        }
+        const data = res.data
+        if (!Array.isArray(data) || data.length === 0) {
+          this.$message.warning('您还没有发布过知识点，无法导出')
+          return
+        }
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `知识点导出_${new Date().toISOString().slice(0, 10)}.json`
+        a.click()
+        URL.revokeObjectURL(url)
+        this.$message.success(`已导出 ${data.length} 条知识点`)
+      } catch (e) {
+        console.error('导出失败:', e)
+        this.$message.error('导出失败，请重试')
+      }
+    },
+    /** 触发选择导入文件 */
+    triggerImportFile() {
+      this.$refs.importFileInput && this.$refs.importFileInput.click()
+    },
+    /** 选择文件后解析并调用导入接口 */
+    async handleImportFile(e) {
+      const file = e.target && e.target.files[0]
+      if (!file) return
+      e.target.value = ''
+      try {
+        const text = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result)
+          reader.onerror = reject
+          reader.readAsText(file, 'UTF-8')
+        })
+        const list = JSON.parse(text)
+        if (!Array.isArray(list) || list.length === 0) {
+          this.$message.warning('文件内容为空或格式不正确')
+          return
+        }
+        const toSend = list.map(item => ({
+          subjectId: item.subjectId,
+          title: item.title,
+          summary: item.summary || '',
+          difficulty: item.difficulty != null ? item.difficulty : 1,
+          content: item.content || ''
+        }))
+        const res = await importKnowledge(toSend)
+        if (res.code === 200) {
+          this.$message.success(res.msg || '导入成功')
+          if (this.activeTab === 'myArticles') this.loadMyArticles()
+        } else {
+          this.$message.error(res.msg || '导入失败')
+        }
+      } catch (err) {
+        console.error('导入失败:', err)
+        this.$message.error('文件解析失败或导入失败，请确认是导出的 JSON 文件')
+      }
     },
     // ==================== 收藏夹管理方法 ====================
     

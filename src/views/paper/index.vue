@@ -14,7 +14,7 @@
             <p class="mb-2">题目列表</p>
             <div class="question-anchor flex flex-wrap">
               <el-tag
-                  v-for="(question, qIndex) in orderedQuestions"
+                  v-for="question in orderedQuestions"
                   :key="question.itemOrder"
                   :type="getQuestionTagType(question.itemOrder)"
                   @click="handleQuestionAnchorClick(question.itemOrder)"
@@ -239,9 +239,8 @@
           {{ getQuestionTypeName(questType) }}
         </div>
         <div class="question-item p-4"
-             v-for="(questionItem,index) in questType.questionDtos"
-             :key="index"
-             v-if="!isClozeChild(questionItem)">
+             v-for="(questionItem, index) in getDisplayQuestions(questType)"
+             :key="questionItem.itemOrder != null ? questionItem.itemOrder : index">
           <!-- 普通题 & 非完形父题 -->
           <template v-if="questionItem.questionType !== 6">
           <div class="q-title">
@@ -602,6 +601,7 @@
   import DOMPurify from 'dompurify';
   import ElImageViewer from "element-ui/packages/image/src/image-viewer";
   import { marked } from 'marked';
+  import { renderMathInHtml, KATEX_ALLOWED_TAGS, KATEX_ALLOWED_ATTR } from '@/utils/katex';
 
 export default {
   name: "index",
@@ -750,6 +750,11 @@ export default {
     isClozeChild(question) {
       return question && question.parentId
     },
+    // 题型下用于列表展示的题目（排除完形子题，避免 v-for 与 v-if 同用）
+    getDisplayQuestions(questType) {
+      if (!questType || !Array.isArray(questType.questionDtos)) return []
+      return questType.questionDtos.filter(q => !this.isClozeChild(q))
+    },
     // 左侧锚点题目列表：不展示完形父题，只展示可作答的小题
     getAnchorQuestions(questType) {
       if (!questType || !Array.isArray(questType.questionDtos)) {
@@ -850,11 +855,13 @@ export default {
             const alt = altMatch ? altMatch[1] : '';
             return `<img src="${src}" alt="${alt}" class="content-image" data-preview="${src}" style="max-width: 100%; cursor: pointer; border-radius: 8px; margin: 16px 0; display: block;" />`;
           });
-          // 使用 DOMPurify 清理渲染后的 HTML
+          // 数学公式 $...$ / $$...$$ 渲染（与后台一致）
+          html = renderMathInHtml(html);
+          // 使用 DOMPurify 清理渲染后的 HTML（允许 KaTeX 标签）
           return DOMPurify.sanitize(html, {
-            ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
-            ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target', 'data-preview'],
-            ALLOW_DATA_ATTR: false
+            ALLOWED_TAGS: KATEX_ALLOWED_TAGS,
+            ALLOWED_ATTR: KATEX_ALLOWED_ATTR,
+            ALLOW_DATA_ATTR: true
           });
         } catch (error) {
           console.error('Markdown渲染失败:', error);

@@ -373,6 +373,7 @@ import {
   createFolder
 } from '@/api/knowledge'
 import { marked } from 'marked'
+import { renderMathInHtml } from '@/utils/katex'
 import { mapGetters } from 'vuex'
 import ElImageViewer from 'element-ui/packages/image/src/image-viewer'
 import { toggleFollow, isFollowing, countFollowers } from '@/api/user'
@@ -737,6 +738,8 @@ export default {
       if (!content) return ''
       try {
         let html = marked(content)
+        // 数学公式 $...$ / $$...$$ 渲染（与后台发布知识点一致）
+        html = renderMathInHtml(html)
         // 处理图片标签，添加预览功能
         html = html.replace(/<img\s+([^>]*?)src\s*=\s*["']([^"']+)["']([^>]*?)>/gi, (match, beforeSrc, src, afterSrc) => {
           // 提取alt属性

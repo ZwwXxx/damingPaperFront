@@ -221,7 +221,7 @@
       <div style="text-align: center;">
         <i class="el-icon-success" style="font-size: 48px; color: #67C23A; margin-bottom: 20px;"></i>
         <p>知识点发布成功！</p>
-        <p>您的知识点已提交审核，管理员审核通过后即可在知识点库中查看。</p>
+        <p>您的知识点已发布，可直接在知识点库中查看。</p>
       </div>
       <div slot="footer" style="text-align: center;">
         <el-button type="primary" @click="goToKnowledgeList">查看知识点库</el-button>
@@ -251,7 +251,7 @@ export default {
       rules: {
         title: [
           { required: true, message: '请输入知识点标题', trigger: 'blur' },
-          { min: 5, max: 100, message: '标题长度应为 5 到 100 个字符', trigger: 'blur' }
+          { min: 1, max: 100, message: '标题长度应为 1 到 100 个字符', trigger: 'blur' }
         ],
         subjectId: [
           { required: true, message: '请选择科目', trigger: 'change' }

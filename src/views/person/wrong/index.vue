@@ -124,6 +124,7 @@ import {optionSubject} from "@/api/subject";
 import ElImageViewer from "element-ui/packages/image/src/image-viewer";
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
+import { renderMathInHtml, KATEX_ALLOWED_TAGS, KATEX_ALLOWED_ATTR } from '@/utils/katex';
 
 export default {
   name: "wrongRecord",
@@ -196,11 +197,13 @@ export default {
             const alt = altMatch ? altMatch[1] : '';
             return `<img src="${src}" alt="${alt}" style="max-width: 200px; max-height: 200px; cursor: pointer; border-radius: 4px;" />`;
           });
-          // 使用 DOMPurify 清理渲染后的 HTML
+          // 数学公式 $...$ / $$...$$ 渲染（与后台一致）
+          html = renderMathInHtml(html);
+          // 使用 DOMPurify 清理渲染后的 HTML（允许 KaTeX 标签）
           return DOMPurify.sanitize(html, {
-            ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'img', 'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
-            ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'style', 'target'],
-            ALLOW_DATA_ATTR: false
+            ALLOWED_TAGS: KATEX_ALLOWED_TAGS,
+            ALLOWED_ATTR: KATEX_ALLOWED_ATTR,
+            ALLOW_DATA_ATTR: true
           });
         } catch (error) {
           console.error('Markdown渲染失败:', error);

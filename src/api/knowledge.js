@@ -276,3 +276,25 @@ export function collectToFolder(pointId, folderId) {
     method: 'post'
   })
 }
+
+/**
+ * 导出当前用户发布的知识点（JSON，便于备份或正式环境导入）
+ */
+export function exportMyKnowledge() {
+  return request({
+    url: '/student/knowledge/export',
+    method: 'get'
+  })
+}
+
+/**
+ * 导入知识点（上传导出的 JSON 文件恢复数据）
+ * @param {Array} list 导出的知识点数组，每项含 subjectId, title, summary, difficulty, content
+ */
+export function importKnowledge(list) {
+  return request({
+    url: '/student/knowledge/import',
+    method: 'post',
+    data: list
+  })
+}

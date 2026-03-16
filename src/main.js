@@ -45,9 +45,9 @@ VMdPreview.use(createCopyCodePlugin());
 // 行号
 import createLineNumbertPlugin from '@kangc/v-md-editor/lib/plugins/line-number/index';
 VMdPreview.use(createLineNumbertPlugin());
-// //数学公式
-// import createKatexPlugin from '@kangc/v-md-editor/lib/plugins/katex/cdn';
-// VMdPreview.use(createKatexPlugin());
+// 数学公式（发布知识点、AI 回复等 v-md-preview 实时预览）
+import createKatexPlugin from '@kangc/v-md-editor/lib/plugins/katex/npm';
+VMdPreview.use(createKatexPlugin());
 // // 流程图
 // import createMermaidPlugin from '@kangc/v-md-editor/lib/plugins/mermaid/cdn';
 // import '@kangc/v-md-editor/lib/plugins/mermaid/mermaid.css';
@@ -73,6 +73,8 @@ Vue.directive("removeAria", removeAria);
 import '@/assets/tailwind.css'
 // 引入 Font Awesome CSS
 import 'font-awesome/css/font-awesome.min.css';
+// 数学公式（知识点、题目等渲染 $...$ / $$...$$ 用）
+import 'katex/dist/katex.min.css';
 
 
 //引入element ui
