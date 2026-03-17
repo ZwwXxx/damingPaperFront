@@ -1723,6 +1723,23 @@ export default {
   margin: 10px 0 !important;
 }
 
+/* 嵌套无序列表：第二级用圆点，第三级用方块，保持缩进 */
+.knowledge-detail .content-section ul ul,
+.content-section ul ul,
+.content-box ul ul {
+  list-style: circle !important;
+  list-style-type: circle !important;
+  padding-left: 26px !important;
+}
+
+.knowledge-detail .content-section ul ul ul,
+.content-section ul ul ul,
+.content-box ul ul ul {
+  list-style: square !important;
+  list-style-type: square !important;
+  padding-left: 26px !important;
+}
+
 .knowledge-detail .content-section ol,
 .content-section ol,
 .content-box ol {

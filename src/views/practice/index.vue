@@ -63,7 +63,8 @@ export default {
       loading: false,
       columns: [],
       activeGroups: [],
-      startingMap: {}
+      startingMap: {},
+      lastRefreshAt: 0
     }
   },
   computed: {
@@ -91,9 +92,37 @@ export default {
   created() {
     this.loadColumns()
   },
+  mounted() {
+    window.addEventListener('focus', this.handleWindowFocus)
+    document.addEventListener('visibilitychange', this.handleVisibilityChange)
+  },
+  activated() {
+    // 如果该页面被 keep-alive 缓存，重新激活时也要刷新，避免跨标签新增后看不到
+    this.refreshColumnsIfNeeded(true)
+  },
+  beforeDestroy() {
+    window.removeEventListener('focus', this.handleWindowFocus)
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange)
+  },
   methods: {
     goBack() {
       this.$router.push('/home')
+    },
+    handleWindowFocus() {
+      this.refreshColumnsIfNeeded(false)
+    },
+    handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        this.refreshColumnsIfNeeded(false)
+      }
+    },
+    refreshColumnsIfNeeded(force) {
+      const now = Date.now()
+      // 简单节流：避免短时间内重复请求
+      if (!force && now - (this.lastRefreshAt || 0) < 1200) return
+      if (this.loading) return
+      this.lastRefreshAt = now
+      this.loadColumns()
     },
     async loadColumns() {
       this.loading = true

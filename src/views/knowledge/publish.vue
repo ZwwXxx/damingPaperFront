@@ -640,7 +640,9 @@ export default {
             if (res.code === 200) {
               if (this.isEdit) {
                 this.$message.success('更新成功')
-                this.goBackToSource()
+                // 更新成功后保持在当前编辑页（不返回列表）
+                await this.loadKnowledgeDetail(this.editId)
+                await this.loadAttachments(this.editId)
               } else {
                 this.successDialogVisible = true
               }
