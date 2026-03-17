@@ -1,153 +1,167 @@
 <template>
   <div class="w-full">
-    <!-- 顶部导航栏 start -->
-
-    <nav class="bg-gray-800 h-16 fixed w-full z-10 nav-bar" :class="{ 'nav-hidden': isNavHidden }">
-      <div class="container mx-auto h-full flex justify-between items-center p-4">
-        <div class="text-white text-lg font-semibold cursor-pointer" @click="goToUrl('/home')">Daming Paper</div>
-        <div class="hidden md:flex space-x-4 items-center">
-          <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white px-3 py-2">首页</a>
-          <a href="#" @click="goToUrl('/forum/index')" class="block text-gray-300 hover:text-white px-3 py-2">论坛</a>
-          <a href="#" @click="goToUrl('/knowledge')" class="block text-gray-300 hover:text-white px-3 py-2">知识库</a>
-          <a href="#" @click="goToUrl('/notice/list')" class="block text-gray-300 hover:text-white px-3 py-2 relative">
+    <!-- 当 showLoginAnimation 为 false 时，才渲染导航栏 / 主体 / 公告 -->
+    <div v-if="!showLoginAnimation">
+      <!-- 顶部导航栏 start -->
+      <nav class="bg-gray-800 h-16 fixed w-full z-10 nav-bar" :class="{ 'nav-hidden': isNavHidden }">
+        <div class="container mx-auto h-full flex justify-between items-center p-4">
+          <div class="text-white text-lg font-semibold cursor-pointer" @click="goToUrl('/home')">Daming Paper</div>
+          <div class="hidden md:flex space-x-4 items-center">
+            <a
+              href="#"
+              @click="goToUrl('/home')"
+              class="block px-3 py-2"
+              :class="navLinkClass('/home')"
+            >首页</a>
+            <a
+              href="#"
+              @click="goToUrl('/practice')"
+              class="block px-3 py-2"
+              :class="navLinkClass('/practice')"
+            >专练</a>
+            <a href="#" @click="goToUrl('/forum/index')" class="block text-gray-300 hover:text-white px-3 py-2">论坛</a>
+            <a href="#" @click="goToUrl('/knowledge')" class="block text-gray-300 hover:text-white px-3 py-2">知识库</a>
+            <a href="#" @click="goToUrl('/notice/list')" class="block text-gray-300 hover:text-white px-3 py-2 relative">
+              公告
+              <span v-if="hasUnreadNotice" class="notice-dot"></span>
+            </a>
+            <a href="#" @click="goToUrl('/feedback/submit')" class="block text-gray-300 hover:text-white px-3 py-2">反馈</a>
+            <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white px-3 py-2">AI</a>
+            <a href="#" @click="goToUrl('/contact')" class="block text-gray-300 hover:text-white px-3 py-2">联系</a>
+            <el-dropdown trigger="hover" @command="handleUserCommand">
+              <span class="avatar-wrapper block px-3 py-2 cursor-pointer text-gray-300 hover:text-white">
+                <img :src="avatar" alt="avatar" class="avatar-img">
+                <i class="el-icon-arrow-down ml-1"></i>
+              </span>
+              <el-dropdown-menu slot="dropdown">
+                <el-dropdown-item command="profile">个人中心</el-dropdown-item>
+                <el-dropdown-item command="feedback">我的反馈</el-dropdown-item>
+                <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </el-dropdown>
+          </div>
+          <div class="md:hidden">
+            <button @click="toggleMenu" class="text-white bg-gray-500 p-1 rounded-md focus:outline-none text-2xl "
+                    id="hamburger-button">
+              &#9776; <!-- 汉堡图标 -->
+            </button>
+          </div>
+        </div>
+      </nav>
+      <transition name="fade">
+        <!-- Mobile Menu -->
+        <div v-if="isMenuOpen" id="mobile-menu"
+             class="md:hidden bg-gray-800 absolute left-0 w-full z-30"
+             :class="{ 'mobile-menu-hidden': isNavHidden }"
+             :style="{ top: isNavHidden ? '0' : '64px' }">
+          <div class="flex items-center p-4 border-b border-gray-700">
+            <img
+              :src="avatar"
+              alt="avatar"
+              class="w-12 h-12 rounded-full border border-gray-600 cursor-pointer"
+              @click="goToUrl('/person/info')"
+            >
+            <div class="ml-3 flex-1 text-white">
+              <p class="font-semibold">{{ name || '个人中心' }}</p>
+              <p class="text-xs text-gray-300">点击头像进入个人资料</p>
+            </div>
+            <el-button type="primary" size="mini" @click="goToUrl('/person/info')">进入</el-button>
+          </div>
+          <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white p-4">首页</a>
+          <a href="#" @click="goToUrl('/practice')" class="block text-gray-300 hover:text-white p-4">专练</a>
+          <a href="#" @click="goToUrl('/forum/index')" class="block text-gray-300 hover:text-white p-4">论坛</a>
+          <a href="#" @click="goToUrl('/knowledge')" class="block text-gray-300 hover:text-white p-4">知识库</a>
+          <a href="#" @click="goToUrl('/notice/list')" class="block text-gray-300 hover:text-white p-4 relative">
             公告
             <span v-if="hasUnreadNotice" class="notice-dot"></span>
           </a>
-          <a href="#" @click="goToUrl('/feedback/submit')" class="block text-gray-300 hover:text-white px-3 py-2">反馈</a>
-          <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white px-3 py-2">AI</a>
-          <a href="#" @click="goToUrl('/contact')" class="block text-gray-300 hover:text-white px-3 py-2">联系</a>
-          <el-dropdown trigger="hover" @command="handleUserCommand">
-            <span class="avatar-wrapper block px-3 py-2 cursor-pointer text-gray-300 hover:text-white">
-              <img :src="avatar" alt="avatar" class="avatar-img">
-              <i class="el-icon-arrow-down ml-1"></i>
-            </span>
-            <el-dropdown-menu slot="dropdown">
-              <el-dropdown-item command="profile">个人中心</el-dropdown-item>
-              <el-dropdown-item command="feedback">我的反馈</el-dropdown-item>
-              <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
-            </el-dropdown-menu>
-          </el-dropdown>
-        </div>
-        <div class="md:hidden">
-          <button @click="toggleMenu" class="text-white bg-gray-500 p-1 rounded-md focus:outline-none text-2xl "
-                  id="hamburger-button">
-            &#9776; <!-- 汉堡图标 -->
-          </button>
-        </div>
-      </div>
-    </nav>
-    <transition name="fade">
-      <!-- Mobile Menu -->
-      <div v-if="isMenuOpen" id="mobile-menu"
-           class="md:hidden bg-gray-800 absolute left-0 w-full z-30"
-           :class="{ 'mobile-menu-hidden': isNavHidden }"
-           :style="{ top: isNavHidden ? '0' : '64px' }">
-        <div class="flex items-center p-4 border-b border-gray-700">
-          <img
-            :src="avatar"
-            alt="avatar"
-            class="w-12 h-12 rounded-full border border-gray-600 cursor-pointer"
-            @click="goToUrl('/person/info')"
-          >
-          <div class="ml-3 flex-1 text-white">
-            <p class="font-semibold">{{ name || '个人中心' }}</p>
-            <p class="text-xs text-gray-300">点击头像进入个人资料</p>
+          <a href="#" @click="goToUrl('/feedback/submit')" class="block text-gray-300 hover:text-white p-4">反馈</a>
+          <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white p-4">AI</a>
+          <a href="#" @click="goToUrl('/contact')" class="block text-gray-300 hover:text-white p-4">联系</a>
+          <div class="p-4 border-t border-gray-700">
+            <el-button type="danger" size="small" class="w-full" @click="logout">退出登录</el-button>
           </div>
-          <el-button type="primary" size="mini" @click="goToUrl('/person/info')">进入</el-button>
         </div>
-        <a href="#" @click="goToUrl('/home')" class="block text-gray-300 hover:text-white p-4">首页</a>
-        <a href="#" @click="goToUrl('/forum/index')" class="block text-gray-300 hover:text-white p-4">论坛</a>
-        <a href="#" @click="goToUrl('/knowledge')" class="block text-gray-300 hover:text-white p-4">知识库</a>
-        <a href="#" @click="goToUrl('/notice/list')" class="block text-gray-300 hover:text-white p-4 relative">
-          公告
-          <span v-if="hasUnreadNotice" class="notice-dot"></span>
-        </a>
-        <a href="#" @click="goToUrl('/feedback/submit')" class="block text-gray-300 hover:text-white p-4">反馈</a>
-        <a href="#" @click="goToUrl('/ai')" class="block text-gray-300 hover:text-white p-4">AI</a>
-        <a href="#" @click="goToUrl('/contact')" class="block text-gray-300 hover:text-white p-4">联系</a>
-        <div class="p-4 border-t border-gray-700">
-          <el-button type="danger" size="small" class="w-full" @click="logout">退出登录</el-button>
+      </transition>
+      <!-- 顶部导航栏 end -->
+    
+      <!-- 中间主体 start -->
+      <main class=" bg-gray-200 pt-20 p-4 ">
+        <!-- 这里可以添加页面内容 -->
+        <!--<keep-alive>-->
+        <router-view></router-view>
+        <!--</keep-alive>-->
+        <!-- 防止路由标签，动态切换 -->
+      </main>
+    
+      <!-- 底部footer页脚 start -->
+      <footer>
+    
+      </footer>
+      <!-- 底部footer页脚 end -->
+    
+      <!-- 可爱公告弹窗 -->
+      <transition name="notice-bounce">
+        <div v-if="noticeDialogVisible" class="notice-dialog-overlay" @click.self="closeNoticeDialog">
+          <div class="notice-dialog-container">
+            <!-- 装饰元素 -->
+            <div class="notice-decoration">
+              <div class="decoration-star star-1">⭐</div>
+              <div class="decoration-star star-2">✨</div>
+              <div class="decoration-star star-3">💫</div>
+              <div class="decoration-circle circle-1"></div>
+              <div class="decoration-circle circle-2"></div>
+            </div>
+            
+            <!-- 关闭按钮 -->
+            <button class="notice-close-btn" @click="closeNoticeDialog">
+              <i class="el-icon-close"></i>
+            </button>
+            
+            <!-- 弹窗内容 -->
+            <div class="notice-dialog-content">
+              <!-- 标题区域 -->
+              <div class="notice-header">
+                <div class="notice-icon-wrapper">
+                  <span class="notice-icon">📢</span>
+                </div>
+                <h3 class="notice-title">最新公告</h3>
+                <p class="notice-subtitle">重要消息，请及时查看哦~</p>
+              </div>
+              
+              <!-- 公告内容 -->
+              <div class="notice-body" v-if="latestNotice">
+                <div class="notice-item-card">
+                  <div class="notice-item-header">
+                    <el-tag :type="getNoticeTypeTag(latestNotice.noticeType)" size="small" class="notice-type-tag">
+                      {{ getNoticeTypeName(latestNotice.noticeType) }}
+                    </el-tag>
+                    <span class="notice-time">
+                      <i class="el-icon-time"></i>
+                      {{ formatNoticeTime(latestNotice.publishTime) }}
+                    </span>
+                  </div>
+                  <h4 class="notice-item-title">{{ latestNotice.noticeTitle }}</h4>
+                  <p class="notice-item-content">{{ getNoticePreview(latestNotice.noticeContent) }}</p>
+                </div>
+              </div>
+              
+              <!-- 操作按钮 -->
+              <div class="notice-footer">
+                <el-button size="medium" @click="closeNoticeDialog">稍后查看</el-button>
+                <el-button type="primary" size="medium" @click="viewNoticeDetail">立即查看</el-button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </transition>
-    <!-- 顶部导航栏 end -->
+      </transition>
+    </div>
 
-    <!-- 中间主体 start -->
-    <main class=" bg-gray-200 pt-20 p-4 ">
-      <!-- 这里可以添加页面内容 -->
-      <!--<keep-alive>-->
-      <router-view></router-view>
-      <!--</keep-alive>-->
-      <!-- 防止路由标签，动态切换 -->
-    </main>
-
-    <!-- 底部footer页脚 start -->
-    <footer>
-
-    </footer>
-    <!-- 底部footer页脚 end -->
-
-    <!-- Lottie登录动画 -->
+    <!-- Lottie登录动画（单独挂在根节点下，避免首页闪烁） -->
     <LottieAnimation 
       :show="showLoginAnimation" 
       @complete="handleAnimationComplete"
     />
-
-    <!-- 可爱公告弹窗 -->
-    <transition name="notice-bounce">
-      <div v-if="noticeDialogVisible" class="notice-dialog-overlay" @click.self="closeNoticeDialog">
-        <div class="notice-dialog-container">
-          <!-- 装饰元素 -->
-          <div class="notice-decoration">
-            <div class="decoration-star star-1">⭐</div>
-            <div class="decoration-star star-2">✨</div>
-            <div class="decoration-star star-3">💫</div>
-            <div class="decoration-circle circle-1"></div>
-            <div class="decoration-circle circle-2"></div>
-          </div>
-          
-          <!-- 关闭按钮 -->
-          <button class="notice-close-btn" @click="closeNoticeDialog">
-            <i class="el-icon-close"></i>
-          </button>
-          
-          <!-- 弹窗内容 -->
-          <div class="notice-dialog-content">
-            <!-- 标题区域 -->
-            <div class="notice-header">
-              <div class="notice-icon-wrapper">
-                <span class="notice-icon">📢</span>
-              </div>
-              <h3 class="notice-title">最新公告</h3>
-              <p class="notice-subtitle">重要消息，请及时查看哦~</p>
-            </div>
-            
-            <!-- 公告内容 -->
-            <div class="notice-body" v-if="latestNotice">
-              <div class="notice-item-card">
-                <div class="notice-item-header">
-                  <el-tag :type="getNoticeTypeTag(latestNotice.noticeType)" size="small" class="notice-type-tag">
-                    {{ getNoticeTypeName(latestNotice.noticeType) }}
-                  </el-tag>
-                  <span class="notice-time">
-                    <i class="el-icon-time"></i>
-                    {{ formatNoticeTime(latestNotice.publishTime) }}
-                  </span>
-                </div>
-                <h4 class="notice-item-title">{{ latestNotice.noticeTitle }}</h4>
-                <p class="notice-item-content">{{ getNoticePreview(latestNotice.noticeContent) }}</p>
-              </div>
-            </div>
-            
-            <!-- 操作按钮 -->
-            <div class="notice-footer">
-              <el-button size="medium" @click="closeNoticeDialog">稍后查看</el-button>
-              <el-button type="primary" size="medium" @click="viewNoticeDetail">立即查看</el-button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </transition>
   </div>
 </template>
 
@@ -239,11 +253,19 @@ export default {
       checkingNotice: false, // 是否正在检查公告（防止重复请求）
       checkNoticeTimer: null, // 检查公告的定时器
       lastCheckTime: null, // 上次检查的时间戳
-      showLoginAnimation: false // 是否显示登录动画
+      // 初始化时就根据 sessionStorage 判断是否需要显示登录动画，
+      // 避免首帧先渲染首页再切换到动画造成闪屏
+      showLoginAnimation: sessionStorage.getItem('showLoginAnimation') === 'true' && !!this.$store && !!this.$store.getters && !!this.$store.getters.token,
+      // 登录 Lottie 动画的兜底定时器，防止异常情况下动画一直不结束
+      loginAnimationTimer: null
     };
   },
 
   methods: {
+    navLinkClass(path) {
+      const isActive = this.$route && this.$route.path === path;
+      return isActive ? 'text-white font-semibold' : 'text-gray-300 hover:text-white';
+    },
     async logout() {
       this.$confirm('确定要退出登录吗？', '退出确认', {
         confirmButtonText: '退出',
@@ -508,24 +530,35 @@ export default {
         }, 1500);
       }
     },
-    /** 检查是否需要显示登录动画 */
+    /** 检查是否需要显示登录动画（挂载后处理计时和清理） */
     checkLoginAnimation() {
-      // 检查sessionStorage中是否有登录动画标记
-      const showAnimation = sessionStorage.getItem('showLoginAnimation');
-      if (showAnimation === 'true' && this.token && this.$route.path !== '/login') {
-        // 显示动画
-        this.showLoginAnimation = true;
-        // 清除标记
-        sessionStorage.removeItem('showLoginAnimation');
-        // 强制显示3秒后隐藏
-        setTimeout(() => {
-          this.showLoginAnimation = false;
-        }, 3000);
+      if (!this.showLoginAnimation) {
+        return;
       }
+      // 已经根据 data 初始值决定显示动画，这里只负责计时和清除标记
+      sessionStorage.removeItem('showLoginAnimation');
+      // 不再用固定 3 秒强制关闭，而是：
+      // 1）优先等待 Lottie 组件触发 complete 事件（见 handleAnimationComplete）
+      // 2）同时设置一个兜底超时时间，防止 complete 异常未触发导致页面一直黑屏
+      if (this.loginAnimationTimer) {
+        clearTimeout(this.loginAnimationTimer);
+      }
+      this.loginAnimationTimer = setTimeout(() => {
+        this.showLoginAnimation = false;
+        this.loginAnimationTimer = null;
+      }, 8000); // 根据动画总时长可以再微调
     },
     /** 动画完成后的处理 */
     handleAnimationComplete() {
-      // 动画完成事件，但实际隐藏由3秒定时器控制
+      // Lottie 播放完整一次后触发，优先用它来关闭动画
+      if (!this.showLoginAnimation) {
+        return;
+      }
+      if (this.loginAnimationTimer) {
+        clearTimeout(this.loginAnimationTimer);
+        this.loginAnimationTimer = null;
+      }
+      this.showLoginAnimation = false;
     }
   },
 };

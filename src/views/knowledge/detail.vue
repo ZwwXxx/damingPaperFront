@@ -55,6 +55,36 @@
           <div class="content-box" v-html="formatContent(pointDetail.content)"></div>
         </div>
 
+        <!-- 辅助理解附件预览（正文内表格暂时隐藏，用右下角入口 + 弹窗代替） -->
+        <div class="attachment-section" v-if="false && attachments && attachments.length" ref="attachmentSection">
+          <h3 class="section-title">📎 辅助理解附件</h3>
+          <el-table
+            :data="attachments"
+            size="small"
+            border
+            style="margin-top: 8px;"
+          >
+            <el-table-column prop="fileName" label="文件名" min-width="220" show-overflow-tooltip />
+            <el-table-column prop="fileType" label="类型" width="90" align="center">
+              <template slot-scope="scope">
+                <el-tag size="mini" v-if="scope.row.fileType === 'html'">HTML</el-tag>
+                <el-tag size="mini" type="success" v-else-if="scope.row.fileType === 'video'">视频</el-tag>
+                <el-tag size="mini" type="info" v-else>{{ scope.row.fileType || '-' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="fileSize" label="大小" width="90" align="center">
+              <template slot-scope="scope">
+                {{ formatFileSize(scope.row.fileSize) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="120" align="center">
+              <template slot-scope="scope">
+                <el-button type="text" size="mini" @click="previewAttachment(scope.row)">预览</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
         <!-- 示例代码 -->
         <div v-if="pointDetail.example" class="example-section">
           <h3 class="section-title">💡 示例</h3>
@@ -319,6 +349,24 @@
                 </ul>
                 <div v-show="titles.length === 0" class="no-catalog">暂无目录</div>
               </div>
+
+              <!-- 附件入口按钮：紧贴目录右侧，跟随目录一起fixed -->
+              <transition name="fade">
+                <div
+                  v-if="attachments && attachments.length"
+                  class="attachment-float-entry"
+                  @click="scrollToAttachment"
+                >
+                  <el-button
+                    type="primary"
+                    class="attachment-float-button"
+                  >
+                    <i class="el-icon-paperclip" style="margin-right: 6px;"></i>
+                    附件预览
+                    <span class="attachment-count">{{ attachments.length }}</span>
+                  </el-button>
+                </div>
+              </transition>
             </div>
           </div>
         </el-col>
@@ -355,6 +403,101 @@
         </el-button>
       </span>
     </el-dialog>
+
+    <!-- 附件预览弹窗（与发布页保持一致体验） -->
+    <el-dialog
+      title="附件预览"
+      :visible.sync="attachmentPreviewVisible"
+      width="80%"
+      top="5vh"
+      :close-on-click-modal="false"
+    >
+      <!-- 附件列表（弹窗左上部分） -->
+      <div v-if="attachments && attachments.length" style="margin-bottom: 16px;">
+        <h4 style="margin: 0 0 8px; font-size: 14px; font-weight: 600; color: #303133;">
+          辅助理解附件（点击“预览”在下方打开）
+        </h4>
+        <el-table
+          :data="attachments"
+          size="mini"
+          border
+          style="max-height: 240px; overflow-y: auto;"
+        >
+          <el-table-column prop="fileName" label="文件名" min-width="220" show-overflow-tooltip />
+          <el-table-column prop="fileType" label="类型" width="90" align="center">
+            <template slot-scope="scope">
+              <el-tag size="mini" v-if="scope.row.fileType === 'html'">HTML</el-tag>
+              <el-tag size="mini" type="success" v-else-if="scope.row.fileType === 'video'">视频</el-tag>
+              <el-tag size="mini" type="info" v-else>{{ scope.row.fileType || '-' }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="fileSize" label="大小" width="90" align="center">
+            <template slot-scope="scope">
+              {{ formatFileSize(scope.row.fileSize) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120" align="center">
+            <template slot-scope="scope">
+              <el-button type="text" size="mini" @click.stop="previewAttachment(scope.row)">预览</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <!-- 具体预览区域 -->
+      <div v-if="currentAttachment">
+        <!-- HTML 附件 -->
+        <div v-if="currentAttachment.fileType === 'html'" style="height: 70vh;">
+          <div v-if="attachmentPreviewLoading" style="height: 100%; display: flex; align-items: center; justify-content: center;">
+            <el-spinner />
+          </div>
+          <iframe
+            v-else-if="currentAttachmentHtml"
+            :srcdoc="currentAttachmentHtml"
+            style="width: 100%; height: 100%; border: none;"
+            sandbox="allow-same-origin allow-scripts"
+          />
+          <el-empty v-else description="附件地址不存在或无效" />
+        </div>
+
+        <!-- 视频附件 -->
+        <div v-else-if="currentAttachment.fileType === 'video'" style="text-align: center;">
+          <div v-if="attachmentPreviewLoading" style="height: 70vh; display: flex; align-items: center; justify-content: center;">
+            <el-spinner />
+          </div>
+          <video
+            v-else-if="currentAttachment.fileUrl"
+            :src="currentAttachment.fileUrl"
+            style="max-width: 100%; max-height: 70vh;"
+            controls
+            controlsList="nodownload"
+          >
+            您的浏览器不支持视频播放，请尝试更换浏览器。
+          </video>
+          <el-empty v-else description="附件地址不存在或无效" />
+        </div>
+
+        <!-- 其他类型 -->
+        <div v-else>
+          <p>当前仅对 HTML / 视频 类型做内嵌预览。</p>
+          <p>
+            文件名：{{ currentAttachment.fileName || '-' }}，
+            类型：{{ currentAttachment.fileType || '未知' }}
+          </p>
+          <el-button
+            v-if="currentAttachment.fileUrl"
+            type="primary"
+            size="mini"
+            @click="openAttachmentInNewTab"
+          >
+            在新标签页中打开
+          </el-button>
+        </div>
+      </div>
+      <div v-else>
+        <el-empty description="暂无可预览的附件" />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -370,7 +513,10 @@ import {
   toggleCommentLike,
   getUserFolders,
   collectToFolder,
-  createFolder
+  createFolder,
+  getKnowledgeAttachments,
+  getKnowledgeAttachmentPreviewUrl,
+  getKnowledgeAttachmentPreviewHtml
 } from '@/api/knowledge'
 import { marked } from 'marked'
 import { renderMathInHtml } from '@/utils/katex'
@@ -454,7 +600,14 @@ export default {
         index: 0
       },
       // 记录滚动位置
-      scrollTop: undefined
+      scrollTop: undefined,
+      // 附件列表
+      attachments: [],
+      // 附件预览
+      attachmentPreviewVisible: false,
+      currentAttachment: null,
+      currentAttachmentHtml: '',
+      attachmentPreviewLoading: false
     }
   },
   created() {
@@ -507,6 +660,8 @@ export default {
         }
         
         console.log('详情数据加载完成', this.pointDetail)
+        // 加载附件列表
+        this.loadAttachments(pointId)
         await this.refreshFollowInfo()
         
       } catch (error) {
@@ -698,6 +853,17 @@ export default {
         this.$message.error('创建失败：' + error.message)
       }
     },
+    /** 加载附件列表 */
+    async loadAttachments(pointId) {
+      try {
+        const res = await getKnowledgeAttachments(pointId)
+        if (res.code === 200) {
+          this.attachments = res.data || []
+        }
+      } catch (e) {
+        console.error('加载附件失败:', e)
+      }
+    },
     /** 返回 */
     goBack() {
       const fromTab = this.$route.params.fromTab
@@ -724,14 +890,29 @@ export default {
       }
       return map[difficulty] || 'info'
     },
-    /** 格式化时间 */
+    /** 格式化时间（精确到秒） */
     formatTime(time) {
       if (!time) return ''
       const date = new Date(time)
       const year = date.getFullYear()
       const month = String(date.getMonth() + 1).padStart(2, '0')
       const day = String(date.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
+      const hour = String(date.getHours()).padStart(2, '0')
+      const minute = String(date.getMinutes()).padStart(2, '0')
+      const second = String(date.getSeconds()).padStart(2, '0')
+      return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+    },
+    /** 附件大小格式化 */
+    formatFileSize(size) {
+      if (!size && size !== 0) return '-'
+      const num = Number(size) || 0
+      if (num < 1024) return num + 'B'
+      const kb = num / 1024
+      if (kb < 1024) return kb.toFixed(1) + 'KB'
+      const mb = kb / 1024
+      if (mb < 1024) return mb.toFixed(1) + 'MB'
+      const gb = mb / 1024
+      return gb.toFixed(1) + 'GB'
     },
     /** 格式化内容（Markdown渲染） */
     formatContent(content) {
@@ -788,11 +969,22 @@ export default {
         }))
       })
     },
-    /** 判断是否有子标题 */
+    /** 判断是否有子标题（增加安全判断） */
     hasChildren(index) {
-      const currentLevel = this.titles[index].level
+      if (!Array.isArray(this.titles) || index == null) {
+        return false
+      }
+      const currentTitle = this.titles[index]
+      if (!currentTitle) {
+        return false
+      }
+      const currentLevel = currentTitle.level
       for (let i = index + 1; i < this.titles.length; i++) {
-        const nextLevel = this.titles[i].level
+        const nextTitle = this.titles[i]
+        if (!nextTitle) {
+          continue
+        }
+        const nextLevel = nextTitle.level
         if (nextLevel > currentLevel) {
           return true
         }
@@ -811,9 +1003,15 @@ export default {
       }
       this.$forceUpdate()
     },
-    /** 判断标题是否应该显示 */
+    /** 判断标题是否应该显示（增加安全判断） */
     shouldShowTitle(index) {
+      if (!Array.isArray(this.titles) || index == null) {
+        return false
+      }
       const currentTitle = this.titles[index]
+      if (!currentTitle) {
+        return false
+      }
       const currentLevel = currentTitle.level
       
       // 顶级标题始终显示
@@ -834,9 +1032,15 @@ export default {
       
       return true
     },
-    /** 展开所有父级标题 */
+    /** 展开所有父级标题（增加安全判断） */
     expandParentTitles(index) {
+      if (!Array.isArray(this.titles) || index == null) {
+        return
+      }
       const currentTitle = this.titles[index]
+      if (!currentTitle) {
+        return
+      }
       const currentLevel = currentTitle.level
       
       for (let i = index - 1; i >= 0; i--) {
@@ -850,9 +1054,15 @@ export default {
         }
       }
     },
-    /** 查找可见的父级标题 */
+    /** 查找可见的父级标题（增加安全判断） */
     findVisibleParent(index) {
+      if (!Array.isArray(this.titles) || index == null) {
+        return index
+      }
       const currentTitle = this.titles[index]
+      if (!currentTitle) {
+        return index
+      }
       const currentLevel = currentTitle.level
       
       if (this.shouldShowTitle(index)) {
@@ -1308,7 +1518,60 @@ export default {
         window.scrollTo(0, this.scrollTop)
         this.scrollTop = undefined
       }
-    }
+    },
+    /** 预览附件（沿用发布页逻辑） */
+    async previewAttachment(row) {
+      if (!row || !row.attachmentId) {
+        this.$message.warning('附件信息不完整')
+        return
+      }
+      let previewUrl = row.previewUrl || row.fileUrl
+      this.currentAttachmentHtml = ''
+      this.attachmentPreviewLoading = true
+
+      try {
+        if (row.fileType === 'html') {
+          const html = await getKnowledgeAttachmentPreviewHtml(row.attachmentId)
+          if (typeof html === 'string' && html.trim()) {
+            this.currentAttachmentHtml = html
+            previewUrl = ''
+          } else {
+            this.$message.error('获取HTML预览内容失败')
+          }
+        } else {
+          try {
+            const res = await getKnowledgeAttachmentPreviewUrl(row.attachmentId, 600)
+            if (res && res.code === 200 && res.previewUrl) {
+              previewUrl = res.previewUrl
+            } else if (res && res.code === 200 && res.data && res.data.previewUrl) {
+              previewUrl = res.data.previewUrl
+            }
+          } catch (e) {
+            // ignore，回退到原始fileUrl
+          }
+        }
+
+        this.currentAttachment = { ...row, previewUrl, fileUrl: previewUrl }
+        this.attachmentPreviewVisible = true
+      } finally {
+        this.attachmentPreviewLoading = false
+      }
+    },
+    /** 在新标签打开附件 */
+    openAttachmentInNewTab() {
+      if (this.currentAttachment && this.currentAttachment.fileUrl) {
+        window.open(this.currentAttachment.fileUrl, '_blank')
+      }
+    },
+    /** 滚动到附件区域（固定入口按钮点击） */
+    scrollToAttachment() {
+      // 直接打开附件弹窗，更符合“入口”语义
+      if (this.attachments && this.attachments.length) {
+        this.attachmentPreviewVisible = true
+        // 默认预览第一个附件，用户也可以在列表中切换
+        this.previewAttachment(this.attachments[0])
+      }
+    },
   },
   
   beforeDestroy() {
@@ -1710,6 +1973,7 @@ export default {
 
 .directory-wrapper {
   margin-left: 20px;
+  position: relative;
 }
 
 .directory {
@@ -1719,6 +1983,7 @@ export default {
   box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
   width: 100%;
   border: 1px solid #e4e7ed;
+  position: relative;
 }
 
 .directory-title {
@@ -2145,6 +2410,47 @@ export default {
   font-size: 14px;
   margin: 0;
   color: #909399;
+}
+
+/* 固定附件入口按钮样式 */
+.attachment-float-entry {
+  position: absolute;
+  top: 8px;
+  left: 100%;
+  margin-left: 12px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.attachment-float-button {
+  padding: 10px 18px !important;
+  border-radius: 999px !important;
+  box-shadow: 0 4px 14px rgba(64, 158, 255, 0.45);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.attachment-count {
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #fff;
+  color: #409eff;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s;
+}
+
+.fade-enter,
+.fade-leave-to {
+  opacity: 0;
 }
 
 @media (max-width: 768px) {

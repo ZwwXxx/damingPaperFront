@@ -207,6 +207,77 @@ export function updateKnowledge(pointId, data) {
   })
 }
 
+/**
+ * 获取知识点附件列表
+ * @param {Number} pointId 知识点ID
+ */
+export function getKnowledgeAttachments(pointId) {
+  return request({
+    url: `/student/knowledge/point/${pointId}/attachments`,
+    method: 'get'
+  })
+}
+
+/**
+ * 上传知识点附件（HTML/视频）
+ * @param {Number} pointId 知识点ID
+ * @param {File} file 文件
+ * @param {Number} sortOrder 排序
+ */
+export function uploadKnowledgeAttachment(pointId, file, sortOrder = 0) {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('sortOrder', sortOrder)
+  return request({
+    url: `/student/knowledge/point/${pointId}/attachments/upload`,
+    method: 'post',
+    data: formData,
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+/**
+ * 更新知识点附件（文件名/排序）
+ */
+export function updateKnowledgeAttachment(attachmentId, data) {
+  return request({
+    url: `/student/knowledge/attachments/${attachmentId}`,
+    method: 'put',
+    data
+  })
+}
+
+/**
+ * 删除知识点附件
+ */
+export function deleteKnowledgeAttachment(attachmentId) {
+  return request({
+    url: `/student/knowledge/attachments/${attachmentId}`,
+    method: 'delete'
+  })
+}
+
+/**
+ * 获取附件预览URL（签名URL，覆盖 Content-Disposition=inline，解决 OSS 强制下载）
+ */
+export function getKnowledgeAttachmentPreviewUrl(attachmentId, expireSeconds = 600) {
+  return request({
+    url: `/student/knowledge/attachments/${attachmentId}/previewUrl`,
+    method: 'get',
+    params: { expireSeconds }
+  })
+}
+
+/**
+ * 获取 HTML 附件预览内容（后端代理，带鉴权；返回 text/html 字符串）
+ */
+export function getKnowledgeAttachmentPreviewHtml(attachmentId) {
+  return request({
+    url: `/student/knowledge/attachments/${attachmentId}/preview`,
+    method: 'get'
+  })
+}
+
 // ==================== 收藏夹管理接口 ====================
 
 /**
@@ -266,6 +337,18 @@ export function deleteKnowledgePoint(pointId) {
 }
 
 /**
+ * 批量删除知识点（仅能删除本人发布的）
+ * @param {Array<number>} pointIds 知识点ID 数组
+ */
+export function batchDeleteKnowledgePoints(pointIds) {
+  return request({
+    url: '/student/knowledge/points',
+    method: 'delete',
+    data: pointIds
+  })
+}
+
+/**
  * 收藏知识点到指定收藏夹
  * @param {Number} pointId 知识点ID
  * @param {Number} folderId 收藏夹ID
@@ -279,11 +362,13 @@ export function collectToFolder(pointId, folderId) {
 
 /**
  * 导出当前用户发布的知识点（JSON，便于备份或正式环境导入）
+ * @param {Array<number>} pointIds 可选，指定要导出的知识点ID，不传或空则导出全部
  */
-export function exportMyKnowledge() {
+export function exportMyKnowledge(pointIds) {
   return request({
     url: '/student/knowledge/export',
-    method: 'get'
+    method: 'get',
+    params: pointIds && pointIds.length ? { pointIds } : {}
   })
 }
 

@@ -45,6 +45,14 @@
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
+      <div class="mt-4 flex items-center justify-between">
+        <div class="text-sm text-gray-500">
+          想按栏目专项刷题？去「专项刷题」看看
+        </div>
+        <el-button type="primary" plain size="small" @click="gotoPractice">
+          专项刷题
+        </el-button>
+      </div>
       <div class="quick-filter mt-4" v-if="subjectList.length">
         <span class="text-gray-500 mr-3">快捷分类：</span>
         <el-tag
@@ -249,6 +257,9 @@ export default {
         params: {paperId: String(paperId)}
       });
     },
+    gotoPractice() {
+      this.$router.push({ name: 'practice' })
+    }
   },
   created() {
     this.fetchSubjects();

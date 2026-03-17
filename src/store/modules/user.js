@@ -105,6 +105,7 @@ const actions = {
     },
 }
 const getters = {
+    token: state => state.token,
     avatar: state => state.avatar,
     id: state => state.id,
     userId: state => state.id,  // userId别名

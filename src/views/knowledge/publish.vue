@@ -125,7 +125,7 @@
             </div>
           </div>
 
-          <!-- 右侧：发布设置 -->
+          <!-- 右侧：发布设置 + 附件管理 -->
           <div class="settings-container">
             <div class="settings-wrapper">
               <h3 class="settings-title">发布设置</h3>
@@ -194,6 +194,61 @@
                 />
               </el-form-item>
 
+              <!-- 附件管理 -->
+              <div class="attachment-section" v-if="isEdit">
+                <h4 class="attachment-title">辅助理解附件</h4>
+                <p class="attachment-desc">可以为当前知识点上传 HTML 动画或视频讲解，便于题目跳转后辅助理解。</p>
+                <el-upload
+                  class="attachment-uploader"
+                  :show-file-list="false"
+                  :http-request="handleAttachmentUpload"
+                  :before-upload="beforeAttachmentUpload"
+                action="#"
+                >
+                  <el-button size="mini" icon="el-icon-upload">上传附件（HTML / 视频）</el-button>
+                </el-upload>
+                <el-table
+                  v-if="attachments && attachments.length"
+                  :data="attachments"
+                  size="mini"
+                  border
+                  style="margin-top: 8px;"
+                  :height="220"
+                >
+                  <el-table-column prop="fileName" label="文件名" min-width="200" show-overflow-tooltip />
+                  <el-table-column prop="fileType" label="类型" width="80" align="center">
+                    <template slot-scope="scope">
+                      <el-tag size="mini" v-if="scope.row.fileType === 'html'">HTML</el-tag>
+                      <el-tag size="mini" type="success" v-else-if="scope.row.fileType === 'video'">视频</el-tag>
+                      <el-tag size="mini" type="info" v-else>{{ scope.row.fileType || '-' }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="fileSize" label="大小" width="80" align="center">
+                    <template slot-scope="scope">
+                      {{ formatFileSize(scope.row.fileSize) }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="sortOrder" label="排序" width="90" align="center">
+                    <template slot-scope="scope">
+                      <el-input-number
+                        v-model="scope.row.sortOrder"
+                        size="mini"
+                        :min="0"
+                        :max="999"
+                        @change="onAttachmentSortChange(scope.row)"
+                      />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="120" align="center">
+                    <template slot-scope="scope">
+                      <el-button type="text" size="mini" @click="previewAttachment(scope.row)">预览</el-button>
+                      <el-button type="text" size="mini" style="color: #F56C6C" @click="removeAttachment(scope.row)">删除</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <el-empty v-else description="暂无附件" :image-size="60" />
+              </div>
+
               <!-- 提交按钮 -->
               <div class="submit-actions">
                 <el-button type="primary" @click="handleSubmit" :loading="submitting" style="width: 100%; margin-bottom: 10px;">
@@ -228,11 +283,80 @@
         <el-button @click="continuePublish">继续发布</el-button>
       </div>
     </el-dialog>
+
+    <!-- 附件预览弹窗（在当前页面内展示 HTML / 视频） -->
+    <el-dialog
+      title="附件预览"
+      :visible.sync="attachmentPreviewVisible"
+      width="80%"
+      top="5vh"
+      :close-on-click-modal="false"
+    >
+      <div v-if="currentAttachment">
+        <!-- HTML 附件：使用 iframe 内嵌展示 -->
+        <div v-if="currentAttachment.fileType === 'html'" style="height: 70vh;">
+          <iframe
+            v-if="currentAttachmentHtml"
+            :srcdoc="currentAttachmentHtml"
+            style="width: 100%; height: 100%; border: none;"
+            sandbox="allow-same-origin allow-scripts"
+          />
+          <el-empty v-else description="附件地址不存在或无效" />
+        </div>
+
+        <!-- 视频附件：使用 video 标签播放 -->
+        <div v-else-if="currentAttachment.fileType === 'video'" style="text-align: center;">
+          <video
+            v-if="currentAttachment.fileUrl"
+            :src="currentAttachment.fileUrl"
+            style="max-width: 100%; max-height: 70vh;"
+            controls
+            controlsList="nodownload"
+          >
+            您的浏览器不支持视频播放，请尝试更换浏览器。
+          </video>
+          <el-empty v-else description="附件地址不存在或无效" />
+        </div>
+
+        <!-- 其他类型：给出下载/新开提示 -->
+        <div v-else>
+          <p>当前仅对 HTML / 视频 类型做内嵌预览。</p>
+          <p>
+            文件名：{{ currentAttachment.fileName || '-' }}，
+            类型：{{ currentAttachment.fileType || '未知' }}
+          </p>
+          <el-button
+            v-if="currentAttachment.fileUrl"
+            type="primary"
+            size="mini"
+            @click="openAttachmentInNewTab"
+          >
+            在新标签页中打开
+          </el-button>
+        </div>
+      </div>
+      <div v-else>
+        <el-empty description="暂无可预览的附件" />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { getSubjects, publishKnowledge, createSubject, getKnowledgeDetail, updateKnowledge } from '@/api/knowledge'
+import {
+  getSubjects,
+  publishKnowledge,
+  createSubject,
+  getKnowledgeDetail,
+  updateKnowledge,
+  getKnowledgeAttachments,
+  uploadKnowledgeAttachment,
+  updateKnowledgeAttachment,
+  deleteKnowledgeAttachment,
+  getKnowledgeAttachmentPreviewUrl,
+  getKnowledgeAttachmentPreviewHtml
+} from '@/api/knowledge'
+import { formatFileSize as formatSizeUtil } from '@/utils/upload'
 
 export default {
   name: 'KnowledgePublish',
@@ -267,7 +391,12 @@ export default {
       successDialogVisible: false,
       scrollSyncing: false,
       scrollTimeout: null,
-      isFullscreen: false
+      isFullscreen: false,
+      attachments: [],
+      // 附件预览
+      attachmentPreviewVisible: false,
+      currentAttachment: null,
+      currentAttachmentHtml: ''
     }
   },
   computed: {
@@ -294,6 +423,7 @@ export default {
         this.editId = pointId
         this.fromPage = from || 'knowledge'
         this.loadKnowledgeDetail(pointId)
+        this.loadAttachments(pointId)
       }
     },
     async loadKnowledgeDetail(pointId) {
@@ -320,6 +450,16 @@ export default {
       } catch (error) {
         console.error('获取知识点详情失败:', error)
         this.$message.error('获取知识点详情失败')
+      }
+    },
+    async loadAttachments(pointId) {
+      try {
+        const res = await getKnowledgeAttachments(pointId)
+        if (res.code === 200) {
+          this.attachments = res.data || []
+        }
+      } catch (e) {
+        console.error('获取附件失败', e)
       }
     },
     async loadSubjects() {
@@ -366,6 +506,123 @@ export default {
         const newPosition = start + prefix.length + selectedText.length
         textarea.setSelectionRange(newPosition, newPosition)
       })
+    },
+
+    // ==================== 附件管理 ====================
+    formatFileSize(size) {
+      return formatSizeUtil(size || 0)
+    },
+    beforeAttachmentUpload(file) {
+      const isHtml = /\.html?$/i.test(file.name)
+      const isVideo = file.type.startsWith('video/')
+      if (!isHtml && !isVideo) {
+        this.$message.error('只允许上传 HTML 或 视频 文件')
+        return false
+      }
+      const sizeMB = file.size / 1024 / 1024
+      if (isHtml && sizeMB > 5) {
+        this.$message.error('HTML 文件不能超过 5MB')
+        return false
+      }
+      if (isVideo && sizeMB > 200) {
+        this.$message.error('视频文件不能超过 200MB')
+        return false
+      }
+      return true
+    },
+    async handleAttachmentUpload(option) {
+      if (!this.editId) {
+        this.$message.error('请先保存知识点后再上传附件')
+        option.onError()
+        return
+      }
+      try {
+        const res = await uploadKnowledgeAttachment(this.editId, option.file, this.attachments.length)
+        if (res.code === 200) {
+          this.$message.success('上传成功')
+          await this.loadAttachments(this.editId)
+          option.onSuccess(res, option.file)
+        } else {
+          this.$message.error(res.msg || '上传失败')
+          option.onError()
+        }
+      } catch (e) {
+        console.error('上传附件失败', e)
+        this.$message.error('上传失败，请重试')
+        option.onError(e)
+      }
+    },
+    async onAttachmentSortChange(row) {
+      try {
+        await updateKnowledgeAttachment(row.attachmentId, {
+          sortOrder: row.sortOrder
+        })
+      } catch (e) {
+        console.error('更新附件排序失败', e)
+      }
+    },
+    async removeAttachment(row) {
+      try {
+        await this.$confirm(`确认删除附件「${row.fileName}」吗？`, '提示', {
+          type: 'warning'
+        })
+        const res = await deleteKnowledgeAttachment(row.attachmentId)
+        if (res.code === 200) {
+          this.$message.success('删除成功')
+          await this.loadAttachments(this.editId)
+        } else {
+          this.$message.error(res.msg || '删除失败')
+        }
+      } catch (e) {
+        if (e !== 'cancel') {
+          console.error('删除附件失败', e)
+        }
+      }
+    },
+    async previewAttachment(row) {
+      if (!row || !row.attachmentId) {
+        this.$message.warning('附件信息不完整')
+        return
+      }
+      let previewUrl = row.previewUrl || row.fileUrl
+      this.currentAttachmentHtml = ''
+
+      // HTML：直接走后端代理预览接口，彻底规避 OSS x-oss-force-download
+      if (row.fileType === 'html') {
+        try {
+          const html = await getKnowledgeAttachmentPreviewHtml(row.attachmentId)
+          if (typeof html === 'string' && html.trim()) {
+            this.currentAttachmentHtml = html
+          } else {
+            this.$message.error('获取HTML预览内容失败')
+            return
+          }
+        } catch (e) {
+          this.$message.error('获取HTML预览内容失败，请重试')
+          return
+        }
+        previewUrl = ''
+      } else {
+        // 非HTML：仍优先使用后端返回的 previewUrl（签名URL inline），失败再退化到 fileUrl
+        try {
+          const res = await getKnowledgeAttachmentPreviewUrl(row.attachmentId, 600)
+          if (res && res.code === 200 && res.previewUrl) {
+            previewUrl = res.previewUrl
+          } else if (res && res.code === 200 && res.data && res.data.previewUrl) {
+            previewUrl = res.data.previewUrl
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      this.currentAttachment = { ...row, previewUrl, fileUrl: previewUrl }
+      this.attachmentPreviewVisible = true
+    },
+    openAttachmentInNewTab() {
+      if (this.currentAttachment && this.currentAttachment.fileUrl) {
+        window.open(this.currentAttachment.fileUrl, '_blank')
+      }
     },
 
     handleSubmit() {
@@ -423,7 +680,15 @@ export default {
 
     continuePublish() {
       this.successDialogVisible = false
+      // 发布成功后继续发布：保留科目，方便同一科目连续创建
+      const keepSubjectId = this.form.subjectId
+      const keepSelectedSubjects = Array.isArray(this.selectedSubjects) ? [...this.selectedSubjects] : []
+
       this.handleReset()
+
+      // 恢复科目选择（resetFields 会把 subjectId 和 selectedSubjects 一并清空）
+      this.form.subjectId = keepSubjectId || null
+      this.selectedSubjects = keepSelectedSubjects
     },
 
     // 初始化滚动同步
@@ -663,7 +928,7 @@ export default {
 }
 
 .settings-container {
-  width: 400px;
+  width: 460px;
   flex-shrink: 0;
 }
 
@@ -671,11 +936,13 @@ export default {
   background: #fff;
   border: 1px solid #e4e7ed;
   border-radius: 8px;
-  padding: 20px;
+  padding: 20px 20px 16px;
   position: sticky;
   top: 80px;
   max-height: calc(100vh - 100px);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .settings-title {
@@ -710,10 +977,48 @@ export default {
   margin-left: 0 !important;
 }
 
+.attachment-section {
+  margin-top: 8px;
+}
+
+.attachment-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.attachment-desc {
+  margin: 4px 0 10px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.attachment-uploader {
+  margin-bottom: 6px;
+}
+
+.attachment-uploader .el-button {
+  width: 100%;
+}
+
+.attachment-section .el-table {
+  font-size: 12px;
+}
+
+.attachment-section .el-table th,
+.attachment-section .el-table td {
+  padding: 4px 6px;
+}
+
 .submit-actions {
-  margin-top: 30px;
-  padding-top: 20px;
+  margin-top: 16px;
+  padding-top: 12px;
   border-top: 1px solid #e4e7ed;
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  background: #fff;
 }
 
 .markdown-editor {
@@ -793,7 +1098,7 @@ export default {
 
 .editor-preview-container {
   display: flex;
-  height: calc(100vh - 250px);
+  min-height: 520px;
   border-top: 1px solid #dcdfe6;
 }
 

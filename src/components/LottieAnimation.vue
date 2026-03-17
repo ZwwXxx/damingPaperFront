@@ -64,7 +64,7 @@ export default {
         
         let isOk = false
         
-        // 监听动画帧，在58帧时循环播放
+        // 监听动画帧，在58帧时循环播放（作为“加载中”阶段）
         this.animation.addEventListener('enterFrame', () => {
           if (!isOk) {
             if (this.animation.currentFrame >= 58) {
@@ -73,10 +73,10 @@ export default {
           }
         })
         
-        // 4秒后停止循环
+        // 3 秒后停止循环，进入“加载完成”动画阶段
         setTimeout(() => {
           isOk = true
-        }, 4000)
+        }, 3000)
         
         // 动画完成后触发事件
         this.animation.addEventListener('complete', () => {

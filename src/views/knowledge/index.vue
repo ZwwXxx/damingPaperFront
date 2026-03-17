@@ -28,8 +28,17 @@
         
         <div class="tab-actions">
           <template v-if="activeTab === 'myArticles'">
-            <el-button size="small" icon="el-icon-download" @click="handleExportKnowledge">导出我的知识点</el-button>
+            <el-button size="small" icon="el-icon-download" @click="handleExportKnowledge">导出全部</el-button>
+            <el-button size="small" icon="el-icon-download" :disabled="selectedExportIds.length === 0" @click="handleExportSelected">
+              导出选中 ({{ selectedExportIds.length }})
+            </el-button>
             <el-button size="small" icon="el-icon-upload2" @click="triggerImportFile">导入知识点</el-button>
+            <el-button size="small" type="danger" icon="el-icon-delete" :disabled="selectedExportIds.length === 0" @click="handleBatchDelete">
+              删除选中 ({{ selectedExportIds.length }})
+            </el-button>
+            <el-button size="small" plain @click="toggleSelectAll">
+              {{ isAllSelected ? '取消全选' : '全选' }}
+            </el-button>
             <input ref="importFileInput" type="file" accept=".json" style="display: none" @change="handleImportFile" />
           </template>
           <el-button type="primary" size="small" icon="el-icon-edit" @click="goPublish">
@@ -240,6 +249,13 @@
         <div v-for="point in pointList" :key="point.pointId" class="point-item" @click="viewDetail(point)">
           <div class="item-header">
             <div class="header-left">
+              <el-checkbox
+                v-if="activeTab === 'myArticles'"
+                :value="selectedExportIds.includes(point.pointId)"
+                @change="(v) => toggleExportSelect(point.pointId, v)"
+                @click.native.stop
+                class="export-checkbox"
+              />
               <span class="title-text">{{ point.title }}</span>
               <el-tag v-if="activeTab === 'myArticles' && point.auditStatus === 0" type="warning" size="mini" class="audit-tag">
                 待人工审核
@@ -378,6 +394,7 @@ import {
   toggleCollect, 
   getMyCollects, 
   deleteKnowledgePoint,
+  batchDeleteKnowledgePoints,
   getUserFolders,
   createFolder,
   updateFolder,
@@ -406,6 +423,11 @@ export default {
     // 获取默认收藏夹
     defaultFolder() {
       return this.folderList.find(folder => folder.isDefault === 1)
+    },
+    // 我的文章当前页是否已全选
+    isAllSelected() {
+      if (this.activeTab !== 'myArticles' || !this.pointList.length) return false
+      return this.pointList.every(p => this.selectedExportIds.includes(p.pointId))
     }
   },
   data() {
@@ -442,6 +464,8 @@ export default {
       selectedKnowledge: null,
       isCollectMode: false,
       currentKnowledgePoint: null,
+      /** 导出时勾选的知识点ID（仅我的文章） */
+      selectedExportIds: [],
       newFolder: {
         folderName: '',
         description: '',
@@ -509,6 +533,9 @@ export default {
     },
     
     handleTabClick(tab) {
+      if (tab && tab.name !== 'myArticles') {
+        this.selectedExportIds = []
+      }
       this.currentPage = 1
       this.resetFilter()
       this.loadDataByTab()
@@ -678,17 +705,73 @@ export default {
     goPublish() {
       this.$router.push({ name: 'knowledgePublish' })
     },
-    /** 导出我的知识点为 JSON 文件（便于备份或正式环境导入） */
+    /** 勾选/取消勾选导出 */
+    toggleExportSelect(pointId, checked) {
+      if (checked) {
+        if (!this.selectedExportIds.includes(pointId)) {
+          this.selectedExportIds.push(pointId)
+        }
+      } else {
+        this.selectedExportIds = this.selectedExportIds.filter(id => id !== pointId)
+      }
+    },
+    /** 导出全部知识点为 JSON 文件 */
     async handleExportKnowledge() {
+      await this.doExport()
+    },
+    /** 导出选中的知识点 */
+    async handleExportSelected() {
+      if (!this.selectedExportIds.length) {
+        this.$message.warning('请先勾选要导出的知识点')
+        return
+      }
+      await this.doExport(this.selectedExportIds)
+    },
+    /** 全选 / 取消全选（仅我的文章当前列表） */
+    toggleSelectAll() {
+      if (this.activeTab !== 'myArticles') return
+      if (this.isAllSelected) {
+        this.selectedExportIds = []
+      } else {
+        this.selectedExportIds = this.pointList.map(p => p.pointId)
+      }
+    },
+    /** 批量删除选中的知识点 */
+    handleBatchDelete() {
+      if (!this.selectedExportIds.length) {
+        this.$message.warning('请先勾选要删除的知识点')
+        return
+      }
+      this.$confirm(`确定要删除选中的 ${this.selectedExportIds.length} 条知识点吗？删除后无法恢复！`, '删除确认', {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger'
+      }).then(() => {
+        batchDeleteKnowledgePoints([...this.selectedExportIds]).then((res) => {
+          if (res.code === 200) {
+            this.$message.success(res.msg || '删除成功')
+            this.selectedExportIds = []
+            this.loadDataByTab()
+          } else {
+            this.$message.error(res.msg || '删除失败')
+          }
+        }).catch(() => {
+          this.$message.error('删除失败')
+        })
+      }).catch(() => {})
+    },
+    /** 执行导出（不传 pointIds 为导出全部） */
+    async doExport(pointIds) {
       try {
-        const res = await exportMyKnowledge()
+        const res = await exportMyKnowledge(pointIds)
         if (res.code !== 200 || !res.data) {
           this.$message.warning(res.msg || '暂无数据可导出')
           return
         }
         const data = res.data
         if (!Array.isArray(data) || data.length === 0) {
-          this.$message.warning('您还没有发布过知识点，无法导出')
+          this.$message.warning(pointIds && pointIds.length ? '所选知识点暂无内容可导出' : '您还没有发布过知识点，无法导出')
           return
         }
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -734,7 +817,20 @@ export default {
         }))
         const res = await importKnowledge(toSend)
         if (res.code === 200) {
-          this.$message.success(res.msg || '导入成功')
+          const data = res.data || {}
+          const successCount = data.successCount ?? 0
+          const skipCount = data.skipCount ?? 0
+          const skippedTitles = data.skippedTitles || []
+          if (skipCount > 0) {
+            const msg = `成功导入 ${successCount} 条；跳过 ${skipCount} 条重复。`
+            const detail = skippedTitles.length ? `重复标题：${skippedTitles.slice(0, 10).join('、')}${skippedTitles.length > 10 ? ' 等' + skippedTitles.length + ' 条' : ''}` : ''
+            this.$alert(detail ? msg + '\n\n' + detail : msg, '导入结果', {
+              confirmButtonText: '确定',
+              type: skipCount > 0 && successCount === 0 ? 'warning' : 'info'
+            })
+          } else {
+            this.$message.success(successCount > 0 ? `成功导入 ${successCount} 条知识点` : '导入完成')
+          }
           if (this.activeTab === 'myArticles') this.loadMyArticles()
         } else {
           this.$message.error(res.msg || '导入失败')
@@ -769,7 +865,7 @@ export default {
       }
     },
     
-    /** 创建收藏夹 */
+    /** 创建收藏夹（供内部调用的实际方法） */
     async createFolderAction() {
       try {
         await this.$refs.folderForm.validate()
@@ -793,6 +889,11 @@ export default {
       } catch (error) {
         console.error('创建收藏夹失败:', error)
       }
+    },
+
+    /** 兼容模版中绑定的createFolder点击事件 */
+    createFolder() {
+      return this.createFolderAction()
     },
 
     /** 选择收藏夹 */
@@ -1040,12 +1141,17 @@ export default {
       const map = { 1: 'success', 2: 'warning', 3: 'danger' }
       return map[difficulty] || 'info'
     },
+    /** 格式化时间（精确到秒） */
     formatTime(time) {
       if (!time) return ''
       const date = new Date(time)
+      const year = date.getFullYear()
       const month = String(date.getMonth() + 1).padStart(2, '0')
       const day = String(date.getDate()).padStart(2, '0')
-      return `${month}-${day}`
+      const hour = String(date.getHours()).padStart(2, '0')
+      const minute = String(date.getMinutes()).padStart(2, '0')
+      const second = String(date.getSeconds()).padStart(2, '0')
+      return `${year}-${month}-${day} ${hour}:${minute}:${second}`
     }
   }
 }
@@ -1134,6 +1240,9 @@ export default {
   display: flex;
   align-items: center;
   flex: 1;
+}
+.export-checkbox {
+  margin-right: 8px;
 }
 .title-text {
   font-size: 16px;

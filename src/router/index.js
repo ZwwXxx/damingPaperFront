@@ -119,6 +119,11 @@ const routes = [
                 path: '/contact',
                 name: 'contact',
                 component: () => import('@/views/contact/index.vue'),
+            },
+            {
+                path: '/practice',
+                name: 'practice',
+                component: () => import('@/views/practice/index.vue'),
             }
 
         ],
