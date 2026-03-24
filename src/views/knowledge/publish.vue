@@ -195,20 +195,24 @@
               </el-form-item>
 
               <!-- 附件管理 -->
-              <div class="attachment-section" v-if="isEdit">
+              <div class="attachment-section">
                 <h4 class="attachment-title">辅助理解附件</h4>
-                <p class="attachment-desc">可以为当前知识点上传 HTML 动画或视频讲解，便于题目跳转后辅助理解。</p>
+                <p class="attachment-desc">
+                  可以为当前知识点上传 HTML 动画或视频讲解，便于题目跳转后辅助理解。
+                  <span v-if="!isEdit" style="color: #e6a23c;">（请先发布保存知识点，保存成功后即可上传附件）</span>
+                </p>
                 <el-upload
                   class="attachment-uploader"
                   :show-file-list="false"
                   :http-request="handleAttachmentUpload"
                   :before-upload="beforeAttachmentUpload"
                 action="#"
+                  :disabled="!isEdit"
                 >
-                  <el-button size="mini" icon="el-icon-upload">上传附件（HTML / 视频）</el-button>
+                  <el-button size="mini" icon="el-icon-upload" :disabled="!isEdit">上传附件（HTML / 视频）</el-button>
                 </el-upload>
                 <el-table
-                  v-if="attachments && attachments.length"
+                  v-if="isEdit && attachments && attachments.length"
                   :data="attachments"
                   size="mini"
                   border
@@ -246,7 +250,7 @@
                     </template>
                   </el-table-column>
                 </el-table>
-                <el-empty v-else description="暂无附件" :image-size="60" />
+                <el-empty v-else :description="isEdit ? '暂无附件' : '发布保存后可上传附件'" :image-size="60" />
               </div>
 
               <!-- 提交按钮 -->
@@ -339,6 +343,28 @@
         <el-empty description="暂无可预览的附件" />
       </div>
     </el-dialog>
+
+    <!-- 悬浮操作：内容很长时也能一键提交/回顶 -->
+    <div class="floating-actions" v-if="!isFullscreen">
+      <el-tooltip effect="dark" :content="isEdit ? '更新知识点（悬浮按钮）' : '发布知识点（悬浮按钮）'" placement="left">
+        <el-button
+          type="primary"
+          class="floating-primary"
+          :loading="submitting"
+          @click="handleSubmit"
+        >
+          <i :class="isEdit ? 'el-icon-check' : 'el-icon-upload'"></i>
+          <span>{{ isEdit ? '更新' : '发布' }}</span>
+          <span class="floating-primary__hint">知识点</span>
+        </el-button>
+      </el-tooltip>
+
+      <el-backtop class="floating-backtop" :right="22" :bottom="78">
+        <div style="height: 40px; width: 40px; border-radius: 12px; background: #fff; border: 1px solid #e4e7ed; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 22px rgba(0,0,0,0.06);">
+          <i class="el-icon-top" style="color:#409eff; font-size: 18px;"></i>
+        </div>
+      </el-backtop>
+    </div>
   </div>
 </template>
 
@@ -884,6 +910,37 @@ export default {
 </script>
 
 <style scoped>
+.floating-actions {
+  position: fixed;
+  right: 140px;
+  bottom: 22px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.floating-primary {
+  box-shadow: 0 10px 22px rgba(64, 158, 255, 0.28);
+  border-radius: 999px;
+  padding: 10px 16px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.floating-primary__hint {
+  font-size: 12px;
+  opacity: 0.9;
+  font-weight: 600;
+}
+
+.floating-backtop {
+  position: static !important;
+}
+
 .knowledge-publish {
   padding: 20px;
   max-width: 1400px;
@@ -1298,6 +1355,16 @@ export default {
   
   .toolbar-tip {
     display: none;
+  }
+
+  .floating-actions {
+    right: 14px;
+    bottom: 14px;
+    gap: 8px;
+  }
+
+  .floating-primary {
+    padding: 10px 14px !important;
   }
 }
 

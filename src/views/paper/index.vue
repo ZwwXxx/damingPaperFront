@@ -7,6 +7,14 @@
   <wrapper size="md" padding="0">
     <!--左侧题目进度-->
     <el-card class="fixed top-20 left-0 w-1/4 ">
+      <div class="difficulty-switch-row">
+        <span class="difficulty-switch-label">显示难度</span>
+        <el-switch
+            v-model="showDifficultyTag"
+            active-text="开"
+            inactive-text="关">
+        </el-switch>
+      </div>
       <template v-if="!antiCheatActive">
         <!-- 按加入顺序：左侧不按题型分组，直接一列题号 -->
         <template v-if="(formData.numberMode || 2) === 2">
@@ -15,12 +23,18 @@
             <div class="question-anchor flex flex-wrap">
               <el-tag
                   v-for="question in orderedQuestions"
-                  :key="question.itemOrder"
+                  :key="question.id != null ? `q-${question.id}` : `order-${question.itemOrder}-${question.questionType || 't'}`"
                   :type="getQuestionTagType(question.itemOrder)"
                   @click="handleQuestionAnchorClick(question.itemOrder)"
                   style="padding: 0; display: flex; justify-content: center; width: calc(20% - 10px); height: 30px;margin: 5px"
-                  :class="['cursor-pointer', {'current-question': question.itemOrder === currentQuestionOrder}]">
-                {{ getDisplayNumberByOrder(question.itemOrder) }}
+                  :class="['cursor-pointer', 'anchor-tag', {'current-question': question.itemOrder === currentQuestionOrder}]">
+                <span class="anchor-tag-number">{{ getDisplayNumberByOrder(question.itemOrder) }}</span>
+                <span
+                    v-if="showDifficultyTag && getDifficultyLevel(question) !== null"
+                    class="anchor-difficulty-badge"
+                    :class="getDifficultyClass(question)">
+                  {{ getDifficultyShortText(question) }}
+                </span>
               </el-tag>
             </div>
           </div>
@@ -35,8 +49,14 @@
               v-for="(question, qIndex) in getAnchorQuestions(questType)" :key="qIndex"
               :type="getQuestionTagType(question.itemOrder)"
               style="padding: 0; display: flex; justify-content: center; width:  calc(20% - 10px); height: 30px;margin: 5px"
-              :class="['cursor-pointer', {'current-question': question.itemOrder === currentQuestionOrder}]">
-            {{ getDisplayNumberByOrder(question.itemOrder) }}
+              :class="['cursor-pointer', 'anchor-tag', {'current-question': question.itemOrder === currentQuestionOrder}]">
+            <span class="anchor-tag-number">{{ getDisplayNumberByOrder(question.itemOrder) }}</span>
+            <span
+                v-if="showDifficultyTag && getDifficultyLevel(question) !== null"
+                class="anchor-difficulty-badge"
+                :class="getDifficultyClass(question)">
+              {{ getDifficultyShortText(question) }}
+            </span>
           </el-tag>
         </div>
       </div>
@@ -47,12 +67,18 @@
           <div class="question-anchor flex flex-wrap">
             <el-tag
                 v-for="(question, qIndex) in orderedQuestions"
-                :key="question.itemOrder"
+                :key="question.id != null ? `q-${question.id}` : `order-${question.itemOrder}-${qIndex}`"
                 :type="getQuestionTagType(question.itemOrder, qIndex)"
                 @click="handleQuestionAnchorClick(question.itemOrder, qIndex)"
                 style="padding: 0; display: flex; justify-content: center; width: calc(20% - 10px); height: 30px;margin: 5px"
-                :class="['cursor-pointer', {'current-question': antiCheatActive && qIndex === currentQuestionIndex}]">
-              {{ qIndex + 1 }}
+                :class="['cursor-pointer', 'anchor-tag', {'current-question': antiCheatActive && qIndex === currentQuestionIndex}]">
+              <span class="anchor-tag-number">{{ qIndex + 1 }}</span>
+              <span
+                  v-if="showDifficultyTag && getDifficultyLevel(question) !== null"
+                  class="anchor-difficulty-badge"
+                  :class="getDifficultyClass(question)">
+                {{ getDifficultyShortText(question) }}
+              </span>
             </el-tag>
           </div>
         </div>
@@ -240,7 +266,7 @@
         </div>
         <div class="question-item p-4"
              v-for="(questionItem, index) in getDisplayQuestions(questType)"
-             :key="questionItem.itemOrder != null ? questionItem.itemOrder : index">
+             :key="questionItem.id != null ? `q-${questionItem.id}` : `order-${questionItem.itemOrder}-${index}`">
           <!-- 普通题 & 非完形父题 -->
           <template v-if="questionItem.questionType !== 6">
           <div class="q-title">
@@ -638,12 +664,15 @@ export default {
       antiCheatActive: false,
       orderedQuestions: [],
       questionIndexByOrder: {},
+      // 按 itemOrder 快速找到题目对象（用于按原卷题号展示）
+      questionByOrder: {},
       currentQuestionIndex: 0,
       // 开发者工具检测相关
       devToolsCheckTimer: null,
       devToolsDetected: false,
       // 浏览器环境检测
       browserEnvironmentTimer: null,
+      showDifficultyTag: false,
       radio: '',
       formData: {},
       scrollCurrentQuestionOrder: -1,
@@ -746,9 +775,91 @@ export default {
     }
   },
   methods: {
+    // 题号规则：统一将 numberMode 归一化为 number，避免 "3" !== 3 导致逻辑分支失效
+    getNormalizedNumberMode() {
+      const raw = this.formData ? this.formData.numberMode : null
+      const n = Number(raw)
+      return Number.isFinite(n) ? n : 2
+    },
+    // 将可能为 string/number 的 id 统一为字符串用于比较（避免 1 !== "1" 导致匹配不到子题）
+    normalizeId(value) {
+      if (value === null || value === undefined) return null
+      // 后端 Long 可能以 string 形式返回；统一转 string 比较最稳
+      return String(value)
+    },
+    // 将可能为 string/number 的数值字段转为 number（失败则返回 null）
+    normalizeNumber(value) {
+      if (value === null || value === undefined || value === '') return null
+      const n = Number(value)
+      return Number.isFinite(n) ? n : null
+    },
+    // 题目难度：1=简单，2=中等，3=困难
+    getDifficultyLevel(question) {
+      const n = this.normalizeNumber(question && question.difficulty)
+      if (n === 1 || n === 2 || n === 3) return n
+      return null
+    },
+    getDifficultyShortText(question) {
+      const level = this.getDifficultyLevel(question)
+      if (level === 1) return '简'
+      if (level === 2) return '中'
+      if (level === 3) return '难'
+      return ''
+    },
+    getDifficultyClass(question) {
+      const level = this.getDifficultyLevel(question)
+      if (level === 1) return 'is-easy'
+      if (level === 2) return 'is-medium'
+      if (level === 3) return 'is-hard'
+      return ''
+    },
+    // 按原卷题号(numberMode=3)时，尽量解析出展示题号（兼容正文使用的“原始 questionDto”没有 originDisplayNo 字段）
+    resolveOriginDisplayNo(question) {
+      if (!question) return null
+      // 1) 优先使用缓存里预计算的 originDisplayNo
+      if (question.originDisplayNo !== null && question.originDisplayNo !== undefined && question.originDisplayNo !== '') {
+        return this.normalizeNumber(question.originDisplayNo) ?? question.originDisplayNo
+      }
+      // 2) 如果带 itemOrder，尝试从 questionByOrder（缓存包装对象）取
+      if (question.itemOrder !== null && question.itemOrder !== undefined && question.itemOrder !== '') {
+        const cached = this.questionByOrder ? this.questionByOrder[String(question.itemOrder)] : null
+        if (cached && cached.originDisplayNo !== null && cached.originDisplayNo !== undefined && cached.originDisplayNo !== '') {
+          return this.normalizeNumber(cached.originDisplayNo) ?? cached.originDisplayNo
+        }
+      }
+      // 3) 完形子题：用（子题 originOrder || 父题 originOrder）+ clozeIndex-1
+      if (question.parentId) {
+        const pid = this.normalizeId(question.parentId)
+        let parent = null
+        const typeList = (this.formData && this.formData.paperQuestionTypeDto) || []
+        for (const type of typeList) {
+          const list = (type && type.questionDtos) || []
+          for (const q of list) {
+            if (q && this.normalizeId(q.id) === pid) {
+              parent = q
+              break
+            }
+          }
+          if (parent) break
+        }
+        const base = this.normalizeNumber(
+          (question.originOrder !== null && question.originOrder !== undefined && question.originOrder !== '')
+            ? question.originOrder
+            : (parent ? parent.originOrder : null)
+        )
+        const idx = this.normalizeNumber(question.clozeIndex)
+        if (base != null) {
+          const offset = idx != null ? Math.max(0, idx - 1) : 0
+          return base + offset
+        }
+      }
+      // 4) 普通题：直接用 originOrder
+      const n = this.normalizeNumber(question.originOrder)
+      return n != null ? n : null
+    },
     // 是否为完形填空的子题（目前 parentId 有值的都视为完形子题）
     isClozeChild(question) {
-      return question && question.parentId
+      return !!(question && question.parentId !== null && question.parentId !== undefined && question.parentId !== '')
     },
     // 题型下用于列表展示的题目（排除完形子题，避免 v-for 与 v-if 同用）
     getDisplayQuestions(questType) {
@@ -791,17 +902,19 @@ export default {
         return []
       }
       const result = []
-      const parentId = parentQuestion.id
+      const parentId = this.normalizeId(parentQuestion.id)
+      if (!parentId) return []
       this.formData.paperQuestionTypeDto.forEach(type => {
         (type.questionDtos || []).forEach(q => {
-          if (q && q.parentId === parentId) {
+          const qParentId = q ? this.normalizeId(q.parentId) : null
+          if (q && qParentId && qParentId === parentId) {
             result.push(q)
           }
         })
       })
       return result.sort((a, b) => {
-        const ai = a.clozeIndex || 0
-        const bi = b.clozeIndex || 0
+        const ai = this.normalizeNumber(a && a.clozeIndex) || 0
+        const bi = this.normalizeNumber(b && b.clozeIndex) || 0
         return ai - bi
       })
     },
@@ -1352,29 +1465,75 @@ export default {
     buildQuestionCache() {
       let questionList = []
       const indexMap = {}
+      const byOrderMap = {}
       const typeList = this.formData.paperQuestionTypeDto || []
+
+      // 预先收集所有题目，构建完形父题映射，用于按原卷题号给子题续号
+      const allRawQuestions = []
+      const clozeParentById = {}
+      typeList.forEach((type) => {
+        (type.questionDtos || []).forEach((q) => {
+          if (!q) return
+          allRawQuestions.push(q)
+          if (q.questionType === 6 && !q.parentId && q.id != null) {
+            clozeParentById[this.normalizeId(q.id)] = q
+          }
+        })
+      })
+
+      const mode = this.getNormalizedNumberMode()
+
       typeList.forEach((type) => {
         (type.questionDtos || []).forEach((question) => {
           // 完形填空父题本身不参与编号与锚点，仅子题作为可作答题目
           if (question && question.questionType === 6) {
             return
           }
-          questionList.push({
+          // 计算“按原卷题号”下的展示题号：完形父题不占号，子题从父题 originOrder 开始顺延
+          let originDisplayNo = null
+          if (mode === 3) {
+            const pid = this.normalizeId(question && question.parentId)
+            if (pid && clozeParentById[pid]) {
+              const parent = clozeParentById[pid]
+              // 优先使用子题自己设置的原卷题号；没有再回退到父题的原卷题号
+              const baseRaw = (question.originOrder !== null && question.originOrder !== undefined)
+                ? question.originOrder
+                : (parent && parent.originOrder)
+              const base = this.normalizeNumber(baseRaw)
+              const idx = this.normalizeNumber(question && question.clozeIndex)
+              const offset = idx != null ? idx - 1 : 0
+              if (Number.isFinite(base)) {
+                originDisplayNo = base + Math.max(0, offset)
+              }
+            } else {
+              const n = this.normalizeNumber(question && question.originOrder)
+              if (n != null) originDisplayNo = n
+            }
+          }
+
+          const wrapped = {
             ...question,
-            questTypeName: this.getQuestionTypeName(type)
-          })
+            questTypeName: this.getQuestionTypeName(type),
+            originDisplayNo
+          }
+          questionList.push(wrapped)
+          if (question.itemOrder !== null && question.itemOrder !== undefined && question.itemOrder !== '') {
+            // object key 最终都会变 string，这里显式用字符串，避免 1 / "1" 混用
+            byOrderMap[String(question.itemOrder)] = wrapped
+          }
         })
       })
-      questionList.sort((a, b) => a.itemOrder - b.itemOrder)
+      questionList.sort((a, b) => (this.normalizeNumber(a && a.itemOrder) || 0) - (this.normalizeNumber(b && b.itemOrder) || 0))
       const orderedList = this.antiCheatEnabled
           ? this.applyPersistedShuffle(questionList)
           : questionList
       orderedList.forEach((question, index) => {
         question.displayOrder = index
-        indexMap[question.itemOrder] = index
+        indexMap[String(question.itemOrder)] = index
       })
       this.orderedQuestions = orderedList
       this.questionIndexByOrder = indexMap
+      this.questionByOrder = byOrderMap
       this.currentQuestionIndex = 0
       this.ensureCurrentQuestionInRange()
     },
@@ -1399,9 +1558,18 @@ export default {
       if (!question) {
         return ''
       }
+      const mode = this.getNormalizedNumberMode()
+      // 按原卷题号：直接使用预计算好的 originDisplayNo，不做补位
+      if (mode === 3) {
+        const raw = this.resolveOriginDisplayNo(question)
+        if (raw === null || raw === undefined || raw === '') return ''
+        const n = this.normalizeNumber(raw)
+        return n != null ? n : String(raw)
+      }
       // 按加入顺序：用当前缓存的顺序映射保证连续编号（兼容历史试卷存在父题占号导致的间断）
-      if ((this.formData.numberMode || 2) === 2) {
-        const index = this.questionIndexByOrder && this.questionIndexByOrder[question.itemOrder]
+      if (mode === 2) {
+        const key = question.itemOrder === null || question.itemOrder === undefined ? null : String(question.itemOrder)
+        const index = key != null ? (this.questionIndexByOrder && this.questionIndexByOrder[key]) : undefined
         if (typeof index === 'number') {
           return index + 1
         }
@@ -1412,9 +1580,23 @@ export default {
       return (question.itemOrder || 0) + 1
     },
     getDisplayNumberByOrder(itemOrder) {
-      const index = this.questionIndexByOrder[itemOrder]
+      const mode = this.getNormalizedNumberMode()
+      const key = itemOrder === null || itemOrder === undefined ? null : String(itemOrder)
+      // 按原卷题号：通过 itemOrder 找到题目，再读 originOrder
+      if (mode === 3 && this.questionByOrder) {
+        const q = key != null ? this.questionByOrder[key] : null
+        if (q) {
+          const raw = q.originDisplayNo
+          if (raw === null || raw === undefined || raw === '') {
+            return ''
+          }
+          const n = this.normalizeNumber(raw)
+          return n != null ? n : String(raw)
+        }
+      }
+      const index = key != null ? this.questionIndexByOrder[key] : undefined
       // 按加入顺序：用 indexMap 保证连续编号
-      if ((this.formData.numberMode || 2) === 2 && typeof index === 'number') {
+      if (mode === 2 && typeof index === 'number') {
         return index + 1
       }
       if (this.antiCheatEnabled && typeof index === 'number') {
@@ -1459,7 +1641,7 @@ export default {
       if (this.antiCheatActive) {
         const targetIndex = typeof displayIndex === 'number'
             ? displayIndex
-            : this.questionIndexByOrder[itemOrder]
+            : this.questionIndexByOrder[String(itemOrder)]
         if (typeof targetIndex === 'number') {
           this.currentQuestionIndex = targetIndex
           window.scrollTo({top: 0, behavior: 'smooth'})
@@ -1732,6 +1914,55 @@ export default {
   transform: none;
 }
 
+.difficulty-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.difficulty-switch-label {
+  font-size: 12px;
+  color: #606266;
+}
+
+.anchor-tag {
+  position: relative;
+  overflow: hidden;
+}
+
+.anchor-tag-number {
+  line-height: 30px;
+}
+
+.anchor-difficulty-badge {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  color: #fff;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  transform: scale(0.95);
+}
+
+.anchor-difficulty-badge.is-easy {
+  background: #67c23a;
+}
+
+.anchor-difficulty-badge.is-medium {
+  background: #e6a23c;
+}
+
+.anchor-difficulty-badge.is-hard {
+  background: #f56c6c;
+}
+
 
 
 /* 安全警告样式 */
@@ -1837,12 +2068,12 @@ export default {
 /* 全局强制覆盖题干图片尺寸 */
 .question-title-content >>> img,
 .question-title-content img[src] {
-  max-width: 200px !important;
-  max-height: 200px !important;
+  max-width: 560px !important;
+  max-height: 560px !important;
   width: auto !important;
   height: auto !important;
-  display: inline-block !important;
-  margin: 10px 0 !important;
+  display: block !important;
+  margin: 18px auto !important;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   cursor: zoom-in;
@@ -1862,13 +2093,8 @@ export default {
 .question-title-content >>> h4,
 .question-title-content >>> h5,
 .question-title-content >>> h6 {
-  display: inline !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-.question-title-content >>> br {
-  display: none !important;
+  margin: 0 0 10px 0;
+  padding: 0;
 }
 
 .question-title-content strong {
@@ -1947,17 +2173,16 @@ export default {
 }
 
 .option-text img {
-  max-width: 200px !important;
-  max-height: 200px !important;
+  max-width: 560px !important;
+  max-height: 560px !important;
   width: auto !important;
   height: auto !important;
-  display: inline-block !important;
-  margin: 5px 0 !important;
+  display: block !important;
+  margin: 16px auto !important;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   cursor: zoom-in;
   transition: transform 0.2s ease;
-  vertical-align: top;
 }
 
 .option-text img:hover {

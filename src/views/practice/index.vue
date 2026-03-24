@@ -163,42 +163,93 @@ export default {
 .group-collapse {
   background: transparent;
 }
+.group-collapse ::v-deep .el-collapse-item__header {
+  height: auto;
+  line-height: 1.2;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  background: #f6f9ff;
+  border: 1px solid #e6efff;
+  border-radius: 10px;
+  color: #1f2d3d;
+  font-weight: 800;
+  position: relative;
+}
+.group-collapse ::v-deep .el-collapse-item__header::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+  border-radius: 6px;
+  background: #4f7cff;
+}
+.group-collapse ::v-deep .el-collapse-item__wrap {
+  border: none;
+  background: transparent;
+}
+.group-collapse ::v-deep .el-collapse-item__content {
+  padding: 0 2px 14px 2px;
+}
 .group-title {
-  font-weight: 700;
-  color: #303133;
+  font-weight: 900;
+  color: #1f2d3d;
 }
 .group-count {
-  margin-left: 6px;
+  margin-left: 10px;
   font-size: 12px;
-  color: #909399;
+  color: #4f7cff;
+  background: rgba(79, 124, 255, 0.10);
+  border: 1px solid rgba(79, 124, 255, 0.22);
+  padding: 2px 8px;
+  border-radius: 999px;
 }
 .columns-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  padding-left: 14px; /* 二级缩进：强化层级 */
+  position: relative;
+}
+.columns-list::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: #e9edf7;
+  border-radius: 2px;
 }
 .column-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 4px;
-  border-bottom: 1px solid #ebeef5;
+  padding: 12px 12px;
+  border: 1px solid #eef2fb;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
   cursor: pointer;
+  transition: all 0.15s ease;
 }
-.column-row:last-child {
-  border-bottom: none;
+.column-row:hover {
+  border-color: #dbe6ff;
+  background: #fbfdff;
+  transform: translateY(-1px);
 }
 .column-main {
   flex: 1;
   min-width: 0;
 }
 .column-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #303133;
+  font-size: 15px;
+  font-weight: 800;
+  color: #24324a;
 }
 .column-desc {
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: 13px;
   color: #909399;
   line-height: 1.6;
