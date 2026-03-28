@@ -15,6 +15,15 @@ export function registry(data){
     })
 }
 
+/** 注册：发送邮箱验证码 */
+export function sendEmailRegisterCode(data) {
+    return request({
+        url: '/quiz/student/user/email/sendRegisterCode',
+        method: 'post',
+        data
+    })
+}
+
 export function getInfo(){
     return request({
         url: '/quiz/student/user/getInfo',

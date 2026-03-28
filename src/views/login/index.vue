@@ -100,83 +100,32 @@
           <p class="form-subtitle">刷题系统 · 让学习更高效</p>
         </div>
 
-        <!-- Tab切换 -->
-        <div class="tab-wrapper">
-          <div 
-            @click="activeTab = 'password'"
-            :class="['tab-item', { 'tab-active': activeTab === 'password' }]">
-            <span>密码登录</span>
-          </div>
-          <div 
-            @click="activeTab = 'code'"
-            :class="['tab-item', { 'tab-active': activeTab === 'code' }]">
-            <span>验证码登录</span>
-          </div>
-          <div class="tab-slider" :style="sliderStyle"></div>
-        </div>
-
-        <!-- 表单区域 -->
+        <!-- 表单区域：密码登录（新用户填邮箱；老用户仍可填历史用户名） -->
         <form @submit.prevent="handleSubmit" class="form-content">
-          <!-- 验证码登录 -->
-          <transition name="fade" mode="out-in">
-            <div v-if="activeTab === 'code'" key="code" class="form-group">
-              <div class="input-group">
-                <label class="input-label">手机号</label>
-                <el-input 
-                  v-model="formData.phone" 
-                  placeholder="请输入手机号"
-                  prefix-icon="el-icon-mobile-phone"
-                  size="large"
-                  class="harmony-input">
-                </el-input>
-              </div>
-              <div class="input-group">
-                <label class="input-label">验证码</label>
-                <div class="code-input-wrapper">
-                  <el-input 
-                    v-model="formData.code" 
-                    placeholder="请输入验证码"
-                    prefix-icon="el-icon-message"
-                    size="large"
-                    class="harmony-input">
-                  </el-input>
-                  <button 
-                    type="button"
-                    class="code-btn"
-                    :disabled="countdown > 0"
-                    @click="sendCode">
-                    {{ countdown > 0 ? `${countdown}s` : '获取验证码' }}
-                  </button>
-                </div>
-              </div>
+          <div class="form-group">
+            <div class="input-group">
+              <label class="input-label">邮箱或用户名</label>
+              <el-input 
+                v-model="formData.userName" 
+                placeholder="新账号填邮箱；老账号填原用户名"
+                prefix-icon="el-icon-user"
+                size="large"
+                class="harmony-input">
+              </el-input>
             </div>
-
-            <!-- 密码登录 -->
-            <div v-else key="password" class="form-group">
-              <div class="input-group">
-                <label class="input-label">用户名</label>
-                <el-input 
-                  v-model="formData.userName" 
-                  placeholder="请输入用户名"
-                  prefix-icon="el-icon-user"
-                  size="large"
-                  class="harmony-input">
-                </el-input>
-              </div>
-              <div class="input-group">
-                <label class="input-label">密码</label>
-                <el-input 
-                  v-model="formData.password" 
-                  type="password"
-                  placeholder="请输入密码"
-                  prefix-icon="el-icon-lock"
-                  size="large"
-                  show-password
-                  class="harmony-input">
-                </el-input>
-              </div>
+            <div class="input-group">
+              <label class="input-label">密码</label>
+              <el-input 
+                v-model="formData.password" 
+                type="password"
+                placeholder="请输入密码"
+                prefix-icon="el-icon-lock"
+                size="large"
+                show-password
+                class="harmony-input">
+              </el-input>
             </div>
-          </transition>
+          </div>
 
           <!-- 记住我 & 忘记密码 -->
           <div class="form-options">
@@ -209,21 +158,42 @@
         ref="registerForm" 
         :model="registerForm" 
         :rules="registerRules"
-        label-width="80px">
-        <el-form-item label="用户名" prop="userName">
+        label-width="80px"
+        @submit.native.prevent>
+        <el-form-item label="邮箱" prop="email">
           <el-input 
-            v-model="registerForm.userName" 
-            placeholder="请输入用户名（4-16位字母数字）"
-            prefix-icon="el-icon-user"
-            maxlength="16"
+            v-model="registerForm.email" 
+            placeholder="将作为登录账号（与密码登录时填写一致）"
+            prefix-icon="el-icon-message"
+            maxlength="64"
             class="harmony-input">
           </el-input>
         </el-form-item>
-        
+
+        <el-form-item label="验证码" prop="emailCode">
+          <div class="code-input-wrapper" style="width:100%;">
+            <el-input 
+              v-model="registerForm.emailCode" 
+              placeholder="请先获取邮箱验证码"
+              prefix-icon="el-icon-key"
+              maxlength="6"
+              class="harmony-input">
+            </el-input>
+            <button 
+              type="button"
+              class="code-btn"
+              style="flex-shrink:0;"
+              :disabled="registerCountdown > 0"
+              @click="sendRegisterCode">
+              {{ registerCountdown > 0 ? `${registerCountdown}s` : '获取验证码' }}
+            </button>
+          </div>
+        </el-form-item>
+
         <el-form-item label="昵称" prop="nickName">
           <el-input 
             v-model="registerForm.nickName" 
-            placeholder="请输入昵称"
+            placeholder="请输入昵称（对外展示）"
             prefix-icon="el-icon-star-off"
             maxlength="20"
             class="harmony-input">
@@ -256,15 +226,15 @@
       </el-form>
       
       <div slot="footer" class="dialog-footer">
-        <el-button @click="registerDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleRegister" :loading="registerLoading">注册</el-button>
+        <el-button native-type="button" @click="registerDialogVisible = false">取消</el-button>
+        <el-button native-type="button" type="primary" @click="handleRegister" :loading="registerLoading">注册</el-button>
       </div>
     </el-dialog>
   </div>
 </template>
 
 <script>
-import { login, registry} from "@/api/user";
+import { login, registry, sendEmailRegisterCode } from "@/api/user";
 import {setToken} from "@/utils/auth";
 import QRCode from 'qrcode'
 
@@ -272,21 +242,13 @@ export default {
   name: "index",
   data() {
     return {
-      // 当前激活的tab：password-密码登录, code-验证码登录
-      activeTab: 'password',
-      // 表单数据
+      // 表单数据（登录名可为邮箱或历史用户名）
       formData: {
         userName: '',
-        password: '',
-        phone: '',
-        code: ''
+        password: ''
       },
       // 记住我
       rememberMe: false,
-      // 验证码倒计时
-      countdown: 0,
-      // 倒计时定时器
-      timer: null,
       
       // ========== 微信扫码登录相关 ==========
       // WebSocket连接
@@ -307,17 +269,30 @@ export default {
       registerLoading: false,
       // 注册表单数据
       registerForm: {
-        userName: '',
+        email: '',
+        emailCode: '',
         nickName: '',
         password: '',
         confirmPassword: ''
       },
+      registerCountdown: 0,
+      registerTimer: null,
       // 注册表单验证规则
       registerRules: {
-        userName: [
-          { required: true, message: '请输入用户名', trigger: 'blur' },
-          { min: 4, max: 16, message: '用户名长度为4-16位', trigger: 'blur' },
-          { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名只能包含字母、数字和下划线', trigger: 'blur' }
+        email: [
+          { required: true, message: '请输入邮箱', trigger: 'blur' },
+          { validator: (rule, value, callback) => {
+            const v = (value || '').trim()
+            const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+            if (!re.test(v)) {
+              callback(new Error('邮箱格式不正确'))
+            } else {
+              callback()
+            }
+          }, trigger: 'blur' }
+        ],
+        emailCode: [
+          { required: true, message: '请输入邮箱验证码', trigger: 'blur' }
         ],
         nickName: [
           { required: true, message: '请输入昵称', trigger: 'blur' },
@@ -340,30 +315,16 @@ export default {
       }
     }
   },
-  computed: {
-    // 计算tab滑块位置
-    sliderStyle() {
-      return {
-        transform: this.activeTab === 'password' ? 'translateX(0)' : 'translateX(100%)'
-      }
-    }
-  },
   methods: {
     // 提交登录
     async handleSubmit() {
-      if (this.activeTab === 'password') {
-        // 密码登录
-        await this.loginByPassword()
-      } else {
-        // 验证码登录
-        await this.loginByCode()
-      }
+      await this.loginByPassword()
     },
     
     // 密码登录
     async loginByPassword() {
       if (!this.formData.userName || !this.formData.password) {
-        this.$message.warning('请输入用户名和密码')
+        this.$message.warning('请输入邮箱（或用户名）和密码')
         return
       }
       
@@ -393,44 +354,33 @@ export default {
         this.$message.error(res.msg || "登录失败")
       }
     },
-    
-    // 验证码登录（预留接口）
-    async loginByCode() {
-      if (!this.formData.phone || !this.formData.code) {
-        this.$message.warning('请输入手机号和验证码')
+
+    async sendRegisterCode() {
+      const email = (this.registerForm.email || '').trim()
+      if (!email) {
+        this.$message.warning('请先填写邮箱')
         return
       }
-      
-      // TODO: 调用验证码登录接口
-      this.$message.info('验证码登录功能开发中...')
-    },
-    
-    // 发送验证码
-    async sendCode() {
-      if (!this.formData.phone) {
-        this.$message.warning('请输入手机号')
+      const emailReg = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+      if (!emailReg.test(email)) {
+        this.$message.warning('请输入正确的邮箱')
         return
       }
-      
-      // 手机号格式验证
-      const phoneReg = /^1[3-9]\d{9}$/
-      if (!phoneReg.test(this.formData.phone)) {
-        this.$message.warning('请输入正确的手机号')
-        return
+      const res = await sendEmailRegisterCode({ email })
+      if (res.code === 200) {
+        this.$message.success(res.msg || '验证码已发送')
+        this.registerCountdown = 60
+        if (this.registerTimer) clearInterval(this.registerTimer)
+        this.registerTimer = setInterval(() => {
+          this.registerCountdown--
+          if (this.registerCountdown <= 0) {
+            clearInterval(this.registerTimer)
+            this.registerTimer = null
+          }
+        }, 1000)
+      } else {
+        this.$message.error(res.msg || '发送失败')
       }
-      
-      // TODO: 调用发送验证码接口
-      this.$message.success('验证码已发送')
-      
-      // 开始倒计时
-      this.countdown = 60
-      this.timer = setInterval(() => {
-        this.countdown--
-        if (this.countdown <= 0) {
-          clearInterval(this.timer)
-          this.timer = null
-        }
-      }, 1000)
     },
     
     // 打开注册对话框
@@ -438,7 +388,8 @@ export default {
       this.registerDialogVisible = true
       // 重置表单
       this.registerForm = {
-        userName: '',
+        email: '',
+        emailCode: '',
         nickName: '',
         password: '',
         confirmPassword: ''
@@ -461,8 +412,9 @@ export default {
         
         // 调用注册接口
         const res = await registry({
-          userName: this.registerForm.userName,
-          nickName: this.registerForm.nickName,
+          email: (this.registerForm.email || '').trim(),
+          emailCode: (this.registerForm.emailCode || '').trim(),
+          nickName: this.registerForm.nickName.trim(),
           password: this.registerForm.password
         })
         
@@ -470,9 +422,7 @@ export default {
           this.$message.success('注册成功！请登录')
           this.registerDialogVisible = false
           
-          // 自动填充用户名到登录表单
-          this.formData.userName = this.registerForm.userName
-          this.activeTab = 'password' // 切换到密码登录
+          this.formData.userName = (this.registerForm.email || '').trim()
         } else {
           this.$message.error(res.msg || '注册失败')
         }
@@ -790,9 +740,8 @@ export default {
   },
   
   beforeDestroy() {
-    // 清除定时器
-    if (this.timer) {
-      clearInterval(this.timer)
+    if (this.registerTimer) {
+      clearInterval(this.registerTimer)
     }
     // 移除事件监听
     if (this.handleClick) {
