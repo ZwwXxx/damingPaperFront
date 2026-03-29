@@ -861,40 +861,106 @@ export default {
     isClozeChild(question) {
       return !!(question && question.parentId !== null && question.parentId !== undefined && question.parentId !== '')
     },
+    /** 完形父题 id -> 父题对象，与 buildQuestionCache / 编辑页排序一致 */
+    buildClozeParentByIdMap() {
+      const clozeParentById = {}
+      const typeList = this.formData.paperQuestionTypeDto || []
+      typeList.forEach((type) => {
+        (type.questionDtos || []).forEach((q) => {
+          if (q && q.questionType === 6 && !q.parentId && q.id != null) {
+            clozeParentById[this.normalizeId(q.id)] = q
+          }
+        })
+      })
+      return clozeParentById
+    },
+    /**
+     * 与后台试卷编辑页 sortQuestionsByOriginOrder 一致：优先原卷题号（含完形子题顺延），否则退回 itemOrder。
+     * 仅用于排序，不改变题库 itemOrder 字段。
+     */
+    computePaperSortNumber(question, clozeParentById) {
+      if (!question) return null
+      // 完形父题（左侧/正文展示块）：与编辑页一致，按「首子题」原卷序定位
+      if (question.questionType === 6 && !this.isClozeChild(question)) {
+        const children = this.getClozeChildren(question)
+        if (children.length) {
+          const n = this.computePaperSortNumber(children[0], clozeParentById)
+          if (n != null) return n
+        }
+        return this.normalizeNumber(question.originOrder)
+      }
+      if (question.questionType === 6) return null
+      const pid = this.normalizeId(question.parentId)
+      if (pid && clozeParentById && clozeParentById[pid]) {
+        const parent = clozeParentById[pid]
+        const baseRaw = (question.originOrder !== null && question.originOrder !== undefined && question.originOrder !== '')
+          ? question.originOrder
+          : (parent && parent.originOrder)
+        const base = this.normalizeNumber(baseRaw)
+        const idx = this.normalizeNumber(question.clozeIndex)
+        if (base != null) {
+          return base + Math.max(0, (idx != null ? idx - 1 : 0))
+        }
+      }
+      const o = this.normalizeNumber(question.originOrder)
+      if (o != null) return o
+      return this.normalizeNumber(question.itemOrder)
+    },
+    getQuestionPaperSortKey(question, clozeParentById) {
+      const map = clozeParentById || this.buildClozeParentByIdMap()
+      const n = this.computePaperSortNumber(question, map)
+      return n != null ? n : (this.normalizeNumber(question && question.itemOrder) ?? 0)
+    },
+    // 与编辑页题目顺序一致（原卷题号优先，再 itemOrder）
+    sortQuestionsByPaperOrder(list) {
+      if (!Array.isArray(list)) return []
+      const map = this.buildClozeParentByIdMap()
+      return list.slice().sort((a, b) => {
+        const ka = this.getQuestionPaperSortKey(a, map)
+        const kb = this.getQuestionPaperSortKey(b, map)
+        if (ka !== kb) return ka - kb
+        return (this.normalizeNumber(a && a.itemOrder) ?? 0) - (this.normalizeNumber(b && b.itemOrder) ?? 0)
+      })
+    },
     // 题型下用于列表展示的题目（排除完形子题，避免 v-for 与 v-if 同用）
     getDisplayQuestions(questType) {
       if (!questType || !Array.isArray(questType.questionDtos)) return []
-      return questType.questionDtos.filter(q => !this.isClozeChild(q))
+      const filtered = questType.questionDtos.filter(q => !this.isClozeChild(q))
+      return this.sortQuestionsByPaperOrder(filtered)
     },
     // 左侧锚点题目列表：不展示完形父题，只展示可作答的小题
     getAnchorQuestions(questType) {
       if (!questType || !Array.isArray(questType.questionDtos)) {
         return []
       }
-      return questType.questionDtos.filter(q => q && q.questionType !== 6)
+      const filtered = questType.questionDtos.filter(q => q && q.questionType !== 6)
+      return this.sortQuestionsByPaperOrder(filtered)
     },
 
-    // 按加入顺序展示：顶层展示项（普通题 + 完形父题），按“首个子题/自身题序”排序
+    // 按加入顺序展示：顶层展示项（普通题 + 完形父题），与编辑页一致按原卷序/题序排序
     getFlatDisplayItems() {
+      const clozeParentById = this.buildClozeParentByIdMap()
       const typeList = this.formData.paperQuestionTypeDto || []
       const items = []
       typeList.forEach(type => {
         (type.questionDtos || []).forEach(q => {
           if (!q) return
-          // 完形子题不作为顶层展示项
           if (q.parentId) return
-          // 完形父题：用其首个子题的 itemOrder 作为排序键
-          if (q.questionType === 6) {
-            const children = this.getClozeChildren(q)
-            const firstOrder = children.length ? children[0].itemOrder : Number.MAX_SAFE_INTEGER
-            items.push({ kind: 'cloze', question: q, sortKey: firstOrder })
-            return
-          }
-          // 普通题：自身 itemOrder 作为排序键
-          items.push({ kind: 'question', question: q, sortKey: q.itemOrder })
+          const sortKey = this.getQuestionPaperSortKey(q, clozeParentById)
+          items.push({
+            kind: q.questionType === 6 ? 'cloze' : 'question',
+            question: q,
+            sortKey
+          })
         })
       })
-      return items.sort((a, b) => (a.sortKey || 0) - (b.sortKey || 0))
+      return items.sort((a, b) => {
+        const d = (a.sortKey || 0) - (b.sortKey || 0)
+        if (d !== 0) return d
+        const aq = a.question
+        const bq = b.question
+        return (this.normalizeNumber(aq && aq.itemOrder) ?? 0) - (this.normalizeNumber(bq && bq.itemOrder) ?? 0)
+      })
     },
     // 获取某个完形父题下的所有子题，按 clozeIndex 排序
     getClozeChildren(parentQuestion) {
@@ -1523,7 +1589,15 @@ export default {
           }
         })
       })
-      questionList.sort((a, b) => (this.normalizeNumber(a && a.itemOrder) || 0) - (this.normalizeNumber(b && b.itemOrder) || 0))
+      // 与编辑页 load 后 sortQuestionsByOriginOrder 一致：原卷题号优先，再 itemOrder（不能仅用 itemOrder）
+      questionList.sort((a, b) => {
+        const sa = this.computePaperSortNumber(a, clozeParentById)
+        const sb = this.computePaperSortNumber(b, clozeParentById)
+        const na = sa != null ? sa : (this.normalizeNumber(a && a.itemOrder) ?? 0)
+        const nb = sb != null ? sb : (this.normalizeNumber(b && b.itemOrder) ?? 0)
+        if (na !== nb) return na - nb
+        return (this.normalizeNumber(a && a.itemOrder) ?? 0) - (this.normalizeNumber(b && b.itemOrder) ?? 0)
+      })
       const orderedList = this.antiCheatEnabled
           ? this.applyPersistedShuffle(questionList)
           : questionList
